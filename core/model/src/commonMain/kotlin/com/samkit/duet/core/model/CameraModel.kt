@@ -11,7 +11,7 @@ enum class FLASH {
     OFF,
 }
 
-enum class CAPTURE_TYPE{
+enum class CaptureType {
     PHOTO,
     VIDEO,
 }
