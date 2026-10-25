@@ -1,35 +1,28 @@
 package com.samkit.duet.core.model
 
-enum class LENS(
-    val value: String
-) {
-    FRONT("front"),
-    BACK("back")
+enum class LENS {
+    FRONT,
+    BACK,
 }
 
-enum class FLASH(
-    val value: String
-) {
-    AUTO("auto"),
-    ON("on"),
-    OFF("off")
+enum class FLASH {
+    AUTO,
+    ON,
+    OFF,
 }
 
-enum class CAPTURE_TYPE(
-    val value: String
-) {
-    PHOTO("photo"),
-    VIDEO("video")
+enum class CAPTURE_TYPE{
+    PHOTO,
+    VIDEO,
 }
 
-enum class CaptureLayout(
-    val value: String
-) {
-    SINGLE("single"),
-    PIP("pip"),
-    SPLIT("split"),
-    SEPARATE("separate")
+enum class CaptureLayout {
+    SINGLE,
+    PIP,
+    SPLIT,
+    SEPARATE,
 }
 
 enum class PipCorner { TopStart, TopEnd, BottomStart, BottomEnd }
+
 enum class SplitDirection { TopBottom, LeftRight }
