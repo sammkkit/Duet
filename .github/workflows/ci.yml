@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v5
+      # build = compile + unit tests + Android lint + ktlintCheck
+      - run: ./gradlew build
+
+  # Pushes to main that bump versionName in androidApp/build.gradle.kts get a v<versionName> tag + GitHub release.
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' androidApp/build.gradle.kts)
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "v$version already released. Bump versionName to cut a new one."
+          else
+            gh release create "v$version" --target "$GITHUB_SHA" --generate-notes
+          fi
