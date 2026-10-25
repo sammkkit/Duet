@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.samkit.duet.core.designsystem.theme.DuetTheme
 import duet.shared.generated.resources.Res
 import duet.shared.generated.resources.compose_multiplatform
 import org.jetbrains.compose.resources.painterResource
@@ -35,7 +36,7 @@ fun App() {
 @Composable
 private fun AppContent() {
     val greeting = koinInject<Greeting>()
-    MaterialTheme {
+    DuetTheme {
         var showContent by remember { mutableStateOf(false) }
         Column(
             modifier =
