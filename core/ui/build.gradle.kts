@@ -4,7 +4,8 @@ plugins {
 
 kotlin {
     sourceSets.commonMain.dependencies {
-        implementation(project(":core:designsystem"))
-        implementation(project(":core:model"))
+        // api: core:ui's public signatures expose LENS, CaptureLayout and LensColors.
+        api(project(":core:designsystem"))
+        api(project(":core:model"))
     }
 }
