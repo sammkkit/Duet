@@ -21,7 +21,7 @@ dependencies {
 
 android {
     namespace = "com.samkit.duet"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.samkit.duet"
@@ -51,4 +51,5 @@ android {
     buildFeatures {
         compose = true
     }
+    compileSdkMinor = 0
 }
