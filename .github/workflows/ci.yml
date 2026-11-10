@@ -1,42 +1,77 @@
 name: CI
 
+# push only on main: on PR branches the pull_request event already runs everything (no duplicate runs).
 on:
   push:
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch: # "Run workflow" button on the Actions tab, for any branch
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Three parallel jobs so each shows as its own check on the PR.
 jobs:
-  build:
+  lint:
+    name: Lint (ktlint + Android lint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
-      - uses: gradle/actions/setup-gradle@v5
-      # build = compile + unit tests + Android lint + ktlintCheck
-      - run: ./gradlew build
+      # Also validates the Gradle wrapper jar, so a tampered wrapper fails the build.
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew ktlintCheck lint
+      - name: Upload lint reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-reports
+          path: |
+            **/build/reports/ktlint/
+            **/build/reports/lint-results-*.html
 
-  # Pushes to main that bump versionName in androidApp/build.gradle.kts get a v<versionName> tag + GitHub release.
-  release:
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  test:
+    name: Unit tests
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      checks: write # test report check with per-test annotations
     steps:
-      - uses: actions/checkout@v5
-      - env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          version=$(grep -oP 'versionName = "\K[^"]+' androidApp/build.gradle.kts)
-          if gh release view "v$version" > /dev/null 2>&1; then
-            echo "v$version already released. Bump versionName to cut a new one."
-          else
-            gh release create "v$version" --target "$GITHUB_SHA" --generate-notes
-          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew allTests
+      - name: Test report
+        if: always()
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: "**/build/test-results/**/*.xml"
+          check_name: Test report
+          detailed_summary: true
+          include_passed: true
+
+  apk:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew :androidApp:assembleDebug
+      # Download from the run page and install on a phone to try this commit.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: duet-debug-apk
+          path: androidApp/build/outputs/apk/debug/*.apk
+          retention-days: 14

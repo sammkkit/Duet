@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Libraries and plugins in gradle/libs.versions.toml (and build-logic).
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    # One PR per week instead of one per library.
+    groups:
+      gradle-dependencies:
+        patterns: ["*"]
+
+  # Versions of the actions used in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]

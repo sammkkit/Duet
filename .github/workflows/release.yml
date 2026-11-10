@@ -1,0 +1,37 @@
+name: Release
+
+# Runs after CI finishes on main, so it never shows as a "skipped" check on PRs.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  # A v<versionName> tag + GitHub release with the APK, only when versionName in androidApp/build.gradle.kts is new.
+  release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read # download the APK from the CI run
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: duet-debug-apk
+          path: apk
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' androidApp/build.gradle.kts)
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "v$version already released. Bump versionName to cut a new one."
+          else
+            gh release create "v$version" apk/*.apk --target "$SHA" --generate-notes
+          fi
