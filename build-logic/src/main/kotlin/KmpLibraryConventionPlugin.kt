@@ -21,7 +21,13 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
                 // iOS targets go here once Xcode is installed (see shared/build.gradle.kts).
                 (this as ExtensionAware).extensions.configure<KotlinMultiplatformAndroidLibraryTarget>("android") {
                     namespace = "com.samkit.duet" + path.replace(':', '.')
-                    compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
+                    // SDK 37+ is installed as "android-37.0": a plain compileSdk = 37 looks for "android-37" and fails sync.
+                    compileSdk {
+                        version =
+                            release(libs.findVersion("android-compileSdk").get().requiredVersion.toInt()) {
+                                minorApiLevel = libs.findVersion("android-compileSdkMinor").get().requiredVersion.toInt()
+                            }
+                    }
                     minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
                     compilerOptions.jvmTarget.set(JvmTarget.JVM_11)
                     // Without this the Android target has no test task and commonTest never runs.
