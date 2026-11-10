@@ -10,6 +10,13 @@ import androidx.compose.ui.unit.dp
 import com.samkit.duet.core.designsystem.components.PillTabs
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.CaptureLayout
+import duet.core.ui.generated.resources.Res
+import duet.core.ui.generated.resources.layout_pip
+import duet.core.ui.generated.resources.layout_separate
+import duet.core.ui.generated.resources.layout_single
+import duet.core.ui.generated.resources.layout_split
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 /** Single · Video call · Split · Separate. */
 @Composable
@@ -18,22 +25,24 @@ fun ModeTabs(
     onSelect: (CaptureLayout) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Resolve labels here: PillTabs' label lambda isn't @Composable, so it can't call stringResource.
+    val labels = CaptureLayout.entries.associateWith { stringResource(it.label()) }
     PillTabs(
         items = CaptureLayout.entries,
         selected = selected,
         onSelect = onSelect,
-        label = { it.label() },
+        label = { labels.getValue(it) },
         modifier = modifier,
     )
 }
 
 // No else branch: a new CaptureLayout won't compile until it gets a label.
-private fun CaptureLayout.label(): String =
+private fun CaptureLayout.label(): StringResource =
     when (this) {
-        CaptureLayout.SINGLE -> "Single"
-        CaptureLayout.PIP -> "Video call"
-        CaptureLayout.SPLIT -> "Split"
-        CaptureLayout.SEPARATE -> "Separate"
+        CaptureLayout.SINGLE -> Res.string.layout_single
+        CaptureLayout.PIP -> Res.string.layout_pip
+        CaptureLayout.SPLIT -> Res.string.layout_split
+        CaptureLayout.SEPARATE -> Res.string.layout_separate
     }
 
 @Preview

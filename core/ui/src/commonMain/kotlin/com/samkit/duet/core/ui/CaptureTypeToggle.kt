@@ -10,6 +10,10 @@ import androidx.compose.ui.unit.dp
 import com.samkit.duet.core.designsystem.components.SegmentedToggle
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.CaptureType
+import duet.core.ui.generated.resources.Res
+import duet.core.ui.generated.resources.capture_photo
+import duet.core.ui.generated.resources.capture_video
+import org.jetbrains.compose.resources.stringResource
 
 /** Photo / Video. */
 @Composable
@@ -18,14 +22,16 @@ fun CaptureTypeToggle(
     onSelect: (CaptureType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val photo = stringResource(Res.string.capture_photo)
+    val video = stringResource(Res.string.capture_video)
     SegmentedToggle(
         items = CaptureType.entries,
         selected = selected,
         onSelect = onSelect,
         label = {
             when (it) {
-                CaptureType.PHOTO -> "Photo"
-                CaptureType.VIDEO -> "Video"
+                CaptureType.PHOTO -> photo
+                CaptureType.VIDEO -> video
             }
         },
         modifier = modifier,

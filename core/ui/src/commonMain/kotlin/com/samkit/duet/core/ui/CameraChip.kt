@@ -13,13 +13,17 @@ import androidx.compose.ui.unit.dp
 import com.samkit.duet.core.designsystem.components.InfoPill
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.LENS
+import duet.core.ui.generated.resources.Res
+import duet.core.ui.generated.resources.lens_back
+import duet.core.ui.generated.resources.lens_front
+import org.jetbrains.compose.resources.stringResource
 
 /** "BACK" / "FRONT" label on a preview, in that camera's colors. [small] is the one inside the PiP window. */
 @Composable
 fun CameraChip(
     lens: LENS,
     modifier: Modifier = Modifier,
-    label: String = lens.name,
+    label: String = stringResource(if (lens == LENS.BACK) Res.string.lens_back else Res.string.lens_front),
     small: Boolean = false,
 ) {
     val colors = lens.colors()

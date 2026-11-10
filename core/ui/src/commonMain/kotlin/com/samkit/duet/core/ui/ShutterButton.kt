@@ -26,6 +26,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.CaptureType
+import duet.core.ui.generated.resources.Res
+import duet.core.ui.generated.resources.shutter_start_recording
+import duet.core.ui.generated.resources.shutter_stop_recording
+import duet.core.ui.generated.resources.shutter_take_photo
+import org.jetbrains.compose.resources.stringResource
 
 private enum class ShutterState { Photo, VideoIdle, Recording }
 
@@ -53,11 +58,13 @@ fun ShutterButton(
     val innerColor by transition.animateColor(label = "color") { if (it == ShutterState.Photo) colors.onSurface else colors.error }
 
     val description =
-        when (state) {
-            ShutterState.Photo -> "Take photo"
-            ShutterState.VideoIdle -> "Start recording"
-            ShutterState.Recording -> "Stop recording"
-        }
+        stringResource(
+            when (state) {
+                ShutterState.Photo -> Res.string.shutter_take_photo
+                ShutterState.VideoIdle -> Res.string.shutter_start_recording
+                ShutterState.Recording -> Res.string.shutter_stop_recording
+            },
+        )
 
     Box(
         modifier =

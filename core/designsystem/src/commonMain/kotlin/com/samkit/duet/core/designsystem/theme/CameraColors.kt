@@ -10,6 +10,8 @@ data class LensColors(
     val accent: Color,
     val container: Color,
     val onContainer: Color,
+    // ponytail: stand-in for the live preview; delete when Phase 2 shows real frames.
+    val placeholder: Color,
 )
 
 /** Camera colors that have no Material 3 role. Read them via DuetTheme.cameraColors. */
@@ -22,8 +24,8 @@ data class CameraColors(
 
 internal val DarkCameraColors =
     CameraColors(
-        back = LensColors(accent = Blue80, container = Blue30, onContainer = Blue90),
-        front = LensColors(accent = Orange80, container = Orange30, onContainer = Orange90),
+        back = LensColors(accent = Blue80, container = Blue30, onContainer = Blue90, placeholder = SlateBlue),
+        front = LensColors(accent = Orange80, container = Orange30, onContainer = Orange90, placeholder = Plum),
         focus = Yellow80,
     )
 

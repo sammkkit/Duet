@@ -40,5 +40,9 @@ internal val Red20 = Color(0xFF690005)
 internal val Red60 = Color(0xFFFF5449)
 internal val Red90 = Color(0xFFFFDAD6)
 
+// Fake preview scenes until Phase 2 has real camera frames
+internal val SlateBlue = Color(0xFF24384A) // back
+internal val Plum = Color(0xFF3B3442) // front
+
 // Focus box
 internal val Yellow80 = Color(0xFFFFD88A)

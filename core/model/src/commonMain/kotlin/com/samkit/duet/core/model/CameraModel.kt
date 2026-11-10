@@ -26,3 +26,5 @@ enum class CaptureLayout {
 enum class PipCorner { TopStart, TopEnd, BottomStart, BottomEnd }
 
 enum class SplitDirection { TopBottom, LeftRight }
+
+enum class PipShape { ROUNDED, CIRCLE }

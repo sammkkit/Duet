@@ -1,6 +1,8 @@
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.VersionCatalogsExtension
+import org.gradle.api.plugins.ExtensionAware
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.getByType
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -17,6 +19,11 @@ class ComposeLibraryConventionPlugin : Plugin<Project> {
             fun lib(alias: String) = libs.findLibrary(alias).get()
 
             extensions.configure<KotlinMultiplatformExtension> {
+                // Compose resources (strings, fonts) are only packaged into the APK when this is on.
+                // Without it the app compiles but crashes with MissingResourceException at runtime.
+                (this as ExtensionAware).extensions.configure<KotlinMultiplatformAndroidLibraryTarget>("android") {
+                    androidResources.enable = true
+                }
                 sourceSets.getByName("commonMain").dependencies {
                     implementation(lib("compose-runtime"))
                     implementation(lib("compose-foundation"))

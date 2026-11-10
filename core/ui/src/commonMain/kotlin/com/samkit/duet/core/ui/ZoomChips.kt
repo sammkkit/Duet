@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.LENS
+import duet.core.ui.generated.resources.Res
+import duet.core.ui.generated.resources.zoom_level
+import org.jetbrains.compose.resources.stringResource
 
 /** Row of zoom presets on a preview. The selected level shows "×" and uses the lens accent color. */
 @Composable
@@ -43,6 +46,7 @@ fun ZoomChips(
         levels.forEach { level ->
             val isSelected = level == selected
             val text = formatZoom(level)
+            val description = stringResource(Res.string.zoom_level, text)
             Box(
                 modifier =
                     Modifier
@@ -50,7 +54,7 @@ fun ZoomChips(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                         .selectable(selected = isSelected, onClick = { onSelect(level) }, role = Role.RadioButton)
-                        .semantics { contentDescription = "Zoom ${text}x" },
+                        .semantics { contentDescription = description },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
