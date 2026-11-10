@@ -1,9 +1,12 @@
 name: CI
 
+# push only on main: on PR branches the pull_request event already runs everything (no duplicate runs).
 on:
   push:
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch: # "Run workflow" button on the Actions tab, for any branch
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -72,26 +75,3 @@ jobs:
           name: duet-debug-apk
           path: androidApp/build/outputs/apk/debug/*.apk
           retention-days: 14
-
-  # Pushes to main that bump versionName in androidApp/build.gradle.kts get a v<versionName> tag + GitHub release with the APK.
-  release:
-    needs: [lint, test, apk]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
-        with:
-          name: duet-debug-apk
-          path: apk
-      - env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          version=$(grep -oP 'versionName = "\K[^"]+' androidApp/build.gradle.kts)
-          if gh release view "v$version" > /dev/null 2>&1; then
-            echo "v$version already released. Bump versionName to cut a new one."
-          else
-            gh release create "v$version" apk/*.apk --target "$GITHUB_SHA" --generate-notes
-          fi
