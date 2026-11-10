@@ -1,0 +1,135 @@
+package com.samkit.duet.feature.camera
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.samkit.duet.core.designsystem.theme.DuetTheme
+import com.samkit.duet.core.model.CaptureLayout
+import com.samkit.duet.core.model.CaptureType
+import com.samkit.duet.feature.camera.layouts.PipLayout
+import com.samkit.duet.feature.camera.layouts.SeparateLayout
+import com.samkit.duet.feature.camera.layouts.SingleLayout
+import com.samkit.duet.feature.camera.layouts.SplitLayout
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Duration.Companion.seconds
+
+/**
+ * Stateful entry point: owns the ViewModel, turns effects into snackbars and navigation.
+ * Everything visual lives in [CameraScreen], which only takes plain state + an action callback.
+ */
+@Composable
+fun CameraRoute(
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToReview: () -> Unit = {},
+    viewModel: CameraViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // The effect collector outlives recompositions; read the latest callbacks, not the ones from the first frame.
+    val toSettings by rememberUpdatedState(onNavigateToSettings)
+    val toReview by rememberUpdatedState(onNavigateToReview)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        // Only handle effects while visible; ones sent in the background wait in the channel.
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.effects.collect { effect ->
+                when (effect) {
+                    // launch: don't block later effects while a snackbar is on screen
+                    is CameraEffect.ShowMessage -> launch { snackbarHostState.showSnackbar(getString(effect.message)) }
+                    CameraEffect.NavigateToSettings -> toSettings()
+                    CameraEffect.NavigateToReview -> toReview()
+                }
+            }
+        }
+    }
+
+    CameraScreen(
+        state = state,
+        onAction = viewModel::onAction,
+        keepOriginals = settings.keepOriginals,
+        snackbarHostState = snackbarHostState,
+    )
+}
+
+/** Stateless: draws [state], reports every tap as a [CameraAction]. Previewable and testable without a ViewModel. */
+@Composable
+fun CameraScreen(
+    state: CameraUiState,
+    onAction: (CameraAction) -> Unit,
+    modifier: Modifier = Modifier,
+    keepOriginals: Boolean = true,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+) {
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { insets ->
+        Column(Modifier.fillMaxSize().padding(insets)) {
+            CameraTopBar(
+                flash = state.flash,
+                showLayoutButton = state.layout != CaptureLayout.SINGLE,
+                onAction = onAction,
+            ) {
+                TopBarCenter(state, onAction)
+            }
+
+            val previewModifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)
+            when (state.layout) {
+                CaptureLayout.SINGLE -> SingleLayout(state, onAction, previewModifier)
+                CaptureLayout.PIP -> PipLayout(state, onAction, previewModifier)
+                CaptureLayout.SPLIT -> SplitLayout(state, onAction, previewModifier)
+                CaptureLayout.SEPARATE -> SeparateLayout(state, onAction, previewModifier)
+            }
+
+            CameraBottomBar(state = state, onAction = onAction)
+        }
+    }
+
+    // Overlays are driven by state like everything else: the ViewModel decides when they show.
+    if (state.isLayoutPickerOpen) LayoutPickerSheet(state, keepOriginals, onAction)
+    if (state.isDualUnavailableOpen) DualUnavailableDialog(onAction)
+}
+
+@Composable
+private fun ScreenPreview(state: CameraUiState) {
+    DuetTheme { CameraScreen(state = state, onAction = {}) }
+}
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SinglePreview() = ScreenPreview(CameraUiState())
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun PipRecordingPreview() =
+    ScreenPreview(CameraUiState(layout = CaptureLayout.PIP, captureType = CaptureType.VIDEO, isRecording = true, elapsed = 42.seconds))
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SplitPreview() = ScreenPreview(CameraUiState(layout = CaptureLayout.SPLIT))
+
+@Preview(widthDp = 390, heightDp = 844)
+@Composable
+private fun SeparatePreview() = ScreenPreview(CameraUiState(layout = CaptureLayout.SEPARATE, isRecording = true, elapsed = 72.seconds))

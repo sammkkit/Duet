@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.duet.composeLibrary)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -14,12 +15,6 @@ kotlin {
 //    }
 
     android {
-        androidResources {
-            enable = true
-        }
-        withHostTest {
-            isIncludeAndroidResources = true
-        }
         withDeviceTestBuilder {
             sourceSetTreeName = "test"
         }.configure {
@@ -41,6 +36,12 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.composeViewmodel)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.core)
+            implementation(libs.navigation3.ui)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
