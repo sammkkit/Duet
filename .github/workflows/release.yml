@@ -7,8 +7,15 @@ on:
     types: [completed]
     branches: [main]
 
+# Two merges in quick succession must not both pick the same pre-release number.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  # A v<versionName> tag + GitHub release with the APK, only when versionName in androidApp/build.gradle.kts is new.
+  # Every green merge to main publishes the APK:
+  #   new versionName  -> release     v<version>                    (marked Latest)
+  #   same versionName -> pre-release v<version>-pre-release-<n>    (Latest unchanged)
   release:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
@@ -30,8 +37,17 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           version=$(grep -oP 'versionName = "\K[^"]+' androidApp/build.gradle.kts)
-          if gh release view "v$version" > /dev/null 2>&1; then
-            echo "v$version already released. Bump versionName to cut a new one."
-          else
-            gh release create "v$version" apk/*.apk --target "$SHA" --generate-notes
+          base="v$version"
+
+          if ! gh release view "$base" > /dev/null 2>&1; then
+            gh release create "$base" apk/*.apk --target "$SHA" --generate-notes --latest
+            exit 0
           fi
+
+          # Highest existing pre-release number for this version, + 1.
+          last=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$base-pre-release-" --jq '.[].ref' \
+            | sed -E "s|.*-pre-release-([0-9]+)$|\1|" | sort -n | tail -1)
+          tag="$base-pre-release-$(( ${last:-0} + 1 ))"
+
+          gh release create "$tag" apk/*.apk --target "$SHA" --prerelease --latest=false \
+            --title "$tag" --notes-start-tag "$base" --generate-notes
