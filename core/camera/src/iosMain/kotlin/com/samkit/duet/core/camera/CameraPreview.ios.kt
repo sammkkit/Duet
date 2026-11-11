@@ -16,6 +16,7 @@ import platform.AVFoundation.AVCaptureVideoPreviewLayer
 import platform.AVFoundation.AVLayerVideoGravityResizeAspectFill
 import platform.CoreGraphics.CGRectZero
 import platform.QuartzCore.CATransaction
+import platform.UIKit.UIColor
 import platform.UIKit.UIView
 
 @Composable
@@ -46,6 +47,7 @@ private class PreviewView : UIView(frame = CGRectZero.readValue()) {
 
     init {
         clipsToBounds = true
+        backgroundColor = UIColor.blackColor // until the first frame arrives (and always on the simulator: no camera)
         layer.addSublayer(previewLayer)
     }
 
