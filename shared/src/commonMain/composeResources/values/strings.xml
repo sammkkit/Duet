@@ -35,8 +35,9 @@
     <string name="open_last_capture">Open last capture</string>
 
     <!-- Camera: messages -->
-    <string name="msg_photo_taken">Photo taken (preview only)</string>
-    <string name="msg_photos_both_taken">Photos taken from both cameras (preview only)</string>
+    <string name="msg_photo_saved">Saved to gallery</string>
+    <string name="msg_photos_saved">Saved both photos to gallery</string>
+    <string name="msg_photo_failed">Couldn't save the photo</string>
     <string name="msg_stop_recording_first">Stop recording to change this</string>
     <string name="msg_back_then_front">Back-then-front capture comes in a later phase</string>
 
@@ -70,8 +71,8 @@
     <string name="done">Done</string>
 
     <!-- Dual camera unavailable dialog -->
-    <string name="dual_unavailable_title">Dual camera isn\'t available</string>
-    <string name="dual_unavailable_body">This phone can\'t run the back and front cameras at the same time. You can use Single mode, or capture back then front, one right after the other.</string>
+    <string name="dual_unavailable_title">Dual camera isn't available</string>
+    <string name="dual_unavailable_body">This phone can't run the back and front cameras at the same time. You can use Single mode, or capture back then front, one right after the other.</string>
     <string name="back_then_front">Back then front</string>
     <string name="use_single">Use single camera</string>
 

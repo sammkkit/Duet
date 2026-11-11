@@ -21,6 +21,7 @@ kotlinx-serialization = "1.11.0"
 navigation3 = "1.1.2"
 ktlint = "14.2.0"
 material3 = "1.10.0-alpha05"
+camerax = "1.6.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -52,11 +53,18 @@ navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui",
 
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
+koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-composeViewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin" }
 
 # Gradle plugins used by build-logic
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+camerax-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }    # the actual hardware backend
+camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" } # ProcessCameraProvider
+camerax-video = { module = "androidx.camera:camera-video", version.ref = "camerax" }        # Recorder, VideoCapture
+camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }          # PreviewView (#9 uses it)
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

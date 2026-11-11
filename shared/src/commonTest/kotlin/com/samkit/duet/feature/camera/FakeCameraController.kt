@@ -2,29 +2,36 @@ package com.samkit.duet.feature.camera
 
 import com.samkit.duet.core.camera.CameraController
 import com.samkit.duet.core.camera.CameraState
+import com.samkit.duet.core.camera.PhotoComposition
 import com.samkit.duet.core.model.FLASH
-import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.SavedFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.time.Duration
 
-class FakeCameraController : CameraController {
-    override val state = MutableStateFlow<CameraState>(CameraState.Idle)
+class FakeCameraController(
+    var supportsDual: Boolean = true,
+) : CameraController {
+    override val state = MutableStateFlow<CameraState>(CameraState.Ready)
 
-    var boundLens: LENS? = null
     var currentZoom = 1f
     var currentFlash = FLASH.OFF
     var photosTaken = 0
-    var nextResult: Result<SavedFile> = Result.success(SavedFile("fake-id"))
+    var photoResult: Result<List<SavedFile>> = Result.success(listOf(SavedFile("fake-photo")))
+    var videoResult: Result<SavedFile> = Result.success(SavedFile("fake-video"))
 
-    override suspend fun bind(lens: LENS) {
-        boundLens = lens
-        state.value = CameraState.Ready
-    }
+    override suspend fun supportsDualCamera() = supportsDual
 
-    override suspend fun takePhoto(): Result<SavedFile> {
+    var lastComposition: PhotoComposition? = null
+    var lastKeepOriginals = false
+
+    override suspend fun takePhoto(
+        composition: PhotoComposition?,
+        keepOriginals: Boolean,
+    ): Result<List<SavedFile>> {
         photosTaken++
-        return nextResult
+        lastComposition = composition
+        lastKeepOriginals = keepOriginals
+        return photoResult
     }
 
     override fun startRecording() {
@@ -33,7 +40,7 @@ class FakeCameraController : CameraController {
 
     override suspend fun stopRecording(): Result<SavedFile> {
         state.value = CameraState.Ready
-        return nextResult
+        return videoResult
     }
 
     override fun setZoom(ratio: Float) {
