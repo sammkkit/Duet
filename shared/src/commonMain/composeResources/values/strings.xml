@@ -34,11 +34,6 @@
     <string name="open_last_capture">Open last capture</string>
 
     <!-- Camera: messages -->
-    <string name="msg_photo_saved">Saved to gallery</string>
-    <string name="msg_photos_saved">Saved both photos to gallery</string>
-    <string name="msg_photo_failed">Couldn't save the photo</string>
-    <string name="msg_stop_recording_first">Stop recording to change this</string>
-    <string name="msg_back_then_front">Back-then-front capture comes in a later phase</string>
 
     <!-- Camera permission -->
     <string name="permission_camera_title">DualCam needs your camera</string>

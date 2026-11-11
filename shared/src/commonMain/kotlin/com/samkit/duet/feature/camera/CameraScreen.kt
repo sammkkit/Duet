@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,7 +35,6 @@ import com.samkit.duet.feature.camera.layouts.SeparateLayout
 import com.samkit.duet.feature.camera.layouts.SingleLayout
 import com.samkit.duet.feature.camera.layouts.SplitLayout
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Duration.Companion.seconds
 
@@ -53,7 +50,6 @@ fun CameraRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // The effect collector outlives recompositions; read the latest callbacks, not the ones from the first frame.
     val toSettings by rememberUpdatedState(onNavigateToSettings)
@@ -67,8 +63,6 @@ fun CameraRoute(
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.effects.collect { effect ->
                 when (effect) {
-                    // launch: don't block later effects while a snackbar is on screen
-                    is CameraEffect.ShowMessage -> launch { snackbarHostState.showSnackbar(getString(effect.message)) }
                     CameraEffect.NavigateToSettings -> toSettings()
                     CameraEffect.Shutter -> {
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
@@ -88,7 +82,6 @@ fun CameraRoute(
         state = state,
         onAction = viewModel::onAction,
         keepOriginals = settings.keepOriginals,
-        snackbarHostState = snackbarHostState,
         shutterFlash = { shutterFlash.value },
     )
 }
@@ -100,13 +93,11 @@ fun CameraScreen(
     onAction: (CameraAction) -> Unit,
     modifier: Modifier = Modifier,
     keepOriginals: Boolean = true,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     shutterFlash: () -> Float = { 0f },
 ) {
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { insets ->
         Column(Modifier.fillMaxSize().padding(insets)) {
             CameraTopBar(
