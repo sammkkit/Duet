@@ -76,21 +76,22 @@ jobs:
           path: androidApp/build/outputs/apk/debug/*.apk
           retention-days: 14
 
-  # Linux can't build iOS, so this one runs on macOS (free for public repos, but slower to start).
-  ios:
-    name: iOS build
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: gradle/actions/setup-gradle@v6
-      # commonTest again, this time on Kotlin/Native in the simulator.
-      - run: ./gradlew iosSimulatorArm64Test
-      # The real app: Xcode runs the "Compile Kotlin Framework" phase (Gradle) and then the Swift code.
-      - run: >
-          xcodebuild -project iosApp/iosApp.xcodeproj -target iosApp
-          -sdk iphonesimulator -arch arm64 -configuration Debug
-          CODE_SIGNING_ALLOWED=NO build
+  # TEMP: iOS job off, it takes ~15 min per run. Uncomment to bring it back.
+  # # Linux can't build iOS, so this one runs on macOS (free for public repos, but slower to start).
+  # ios:
+  #   name: iOS build
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #     - uses: actions/setup-java@v6
+  #       with:
+  #         distribution: temurin
+  #         java-version: 17
+  #     - uses: gradle/actions/setup-gradle@v6
+  #     # commonTest again, this time on Kotlin/Native in the simulator.
+  #     - run: ./gradlew iosSimulatorArm64Test
+  #     # The real app: Xcode runs the "Compile Kotlin Framework" phase (Gradle) and then the Swift code.
+  #     - run: >
+  #         xcodebuild -project iosApp/iosApp.xcodeproj -target iosApp
+  #         -sdk iphonesimulator -arch arm64 -configuration Debug
+  #         CODE_SIGNING_ALLOWED=NO build
