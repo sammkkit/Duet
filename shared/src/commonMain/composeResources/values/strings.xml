@@ -40,6 +40,13 @@
     <string name="msg_stop_recording_first">Stop recording to change this</string>
     <string name="msg_back_then_front">Back-then-front capture comes in a later phase</string>
 
+    <!-- Camera permission -->
+    <string name="permission_camera_title">DualCam needs your camera</string>
+    <string name="permission_camera_body">Allow camera access to see the preview and take photos and videos. Nothing leaves your phone.</string>
+    <string name="permission_camera_blocked_body">Camera access is turned off for DualCam. Open Settings, tap Permissions, and allow Camera.</string>
+    <string name="permission_grant">Allow camera</string>
+    <string name="permission_open_settings">Open settings</string>
+
     <!-- Layout picker sheet -->
     <string name="sheet_title">Capture layout</string>
     <string name="sheet_subtitle">How the two cameras are shown and saved</string>

@@ -6,6 +6,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
+import com.samkit.duet.feature.camera.CameraPermissionGate
 import com.samkit.duet.feature.camera.CameraRoute
 import com.samkit.duet.feature.review.ReviewScreen
 import com.samkit.duet.feature.settings.SettingsRoute
@@ -52,10 +53,12 @@ fun DuetNavigation() {
         entryProvider =
             entryProvider {
                 entry<CameraKey> {
-                    CameraRoute(
-                        onNavigateToSettings = { backStack.add(SettingsKey) },
-                        onNavigateToReview = { backStack.add(ReviewKey) },
-                    )
+                    CameraPermissionGate {
+                        CameraRoute(
+                            onNavigateToSettings = { backStack.add(SettingsKey) },
+                            onNavigateToReview = { backStack.add(ReviewKey) },
+                        )
+                    }
                 }
                 entry<SettingsKey> { SettingsRoute(onBack = back) }
                 entry<ReviewKey> { ReviewScreen(onBack = back) }
