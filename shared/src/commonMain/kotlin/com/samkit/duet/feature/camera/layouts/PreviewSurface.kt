@@ -10,10 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import com.samkit.duet.core.camera.CameraPreview
 import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.ui.colors
 
-/** One camera's preview area. Phase 1: a colored box; Phase 2 puts the live camera feed here. */
+/** One camera's live preview, on its placeholder color until the first frame arrives. */
 @Composable
 internal fun PreviewSurface(
     lens: LENS,
@@ -29,8 +30,10 @@ internal fun PreviewSurface(
                 .clip(shape)
                 .background(colors.placeholder)
                 .then(if (bordered) Modifier.border(2.dp, colors.accent, shape) else Modifier),
-        content = content,
-    )
+    ) {
+        CameraPreview(lens = lens, modifier = Modifier.matchParentSize())
+        content()
+    }
 }
 
 internal fun LENS.other(): LENS = if (this == LENS.BACK) LENS.FRONT else LENS.BACK

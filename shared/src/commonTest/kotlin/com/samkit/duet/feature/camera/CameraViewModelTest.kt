@@ -4,7 +4,12 @@ import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
 import com.samkit.duet.core.model.FLASH
 import com.samkit.duet.core.model.LENS
+import com.samkit.duet.core.model.SavedFile
 import com.samkit.duet.core.settings.SettingsRepository
+import duet.shared.generated.resources.Res
+import duet.shared.generated.resources.msg_photo_failed
+import duet.shared.generated.resources.msg_photo_saved
+import duet.shared.generated.resources.msg_photos_saved
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -36,11 +41,11 @@ class CameraViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun videoViewModel() =
-        CameraViewModel(SettingsRepository()).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
+        CameraViewModel(SettingsRepository(), FakeCameraController()).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
 
     @Test
     fun startsWithDefaultState() {
-        assertEquals(CameraUiState(), CameraViewModel(SettingsRepository()).state.value)
+        assertEquals(CameraUiState(), CameraViewModel(SettingsRepository(), FakeCameraController()).state.value)
     }
 
     @Test
@@ -56,7 +61,7 @@ class CameraViewModelTest {
     @Test
     fun shutterInPhotoDoesNotRecordAndShowsMessage() =
         runTest(dispatcher) {
-            val vm = CameraViewModel(SettingsRepository())
+            val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
             vm.onAction(CameraAction.ShutterClick)
             assertFalse(vm.state.value.isRecording)
             assertIs<CameraEffect.ShowMessage>(vm.effects.first())
@@ -107,7 +112,7 @@ class CameraViewModelTest {
     @Test
     fun separateModeRecordsWhenEitherCameraIsVideo() =
         runTest(dispatcher) {
-            val vm = CameraViewModel(SettingsRepository())
+            val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
             vm.onAction(CameraAction.SelectLayout(CaptureLayout.SEPARATE))
             vm.onAction(CameraAction.SelectSeparateType(LENS.BACK, CaptureType.PHOTO))
             vm.onAction(CameraAction.SelectSeparateType(LENS.FRONT, CaptureType.PHOTO))
@@ -123,14 +128,14 @@ class CameraViewModelTest {
     @Test
     fun settingsButtonEmitsNavigation() =
         runTest(dispatcher) {
-            val vm = CameraViewModel(SettingsRepository())
+            val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
             vm.onAction(CameraAction.OpenSettings)
             assertEquals(CameraEffect.NavigateToSettings, vm.effects.first())
         }
 
     @Test
     fun splitRatioIsClamped() {
-        val vm = CameraViewModel(SettingsRepository())
+        val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
         vm.onAction(CameraAction.ChangeSplitRatio(0.9f))
         assertEquals(MAX_SPLIT_RATIO, vm.state.value.splitRatio)
         vm.onAction(CameraAction.ChangeSplitRatio(0.1f))
@@ -139,34 +144,36 @@ class CameraViewModelTest {
 
     @Test
     fun flashCycles() {
-        val vm = CameraViewModel(SettingsRepository())
+        val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
         val seen = List(3) { vm.onAction(CameraAction.CycleFlash).let { vm.state.value.flash } }
         assertEquals(listOf(FLASH.AUTO, FLASH.ON, FLASH.OFF), seen)
     }
 
     @Test
     fun swapFlipsMainLens() {
-        val vm = CameraViewModel(SettingsRepository())
+        val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
         vm.onAction(CameraAction.SwapCameras)
         assertEquals(LENS.FRONT, vm.state.value.mainLens)
     }
 
     @Test
-    fun dualLayoutOnUnsupportedPhoneOpensDialogInsteadOfSwitching() {
-        val vm = CameraViewModel(SettingsRepository(), dualCameraSupported = false)
-        vm.onAction(CameraAction.SelectLayout(CaptureLayout.SPLIT))
-        assertTrue(vm.state.value.isDualUnavailableOpen)
-        assertEquals(CaptureLayout.SINGLE, vm.state.value.layout)
+    fun dualLayoutOnUnsupportedPhoneOpensDialogInsteadOfSwitching() =
+        runTest(dispatcher) {
+            val vm = CameraViewModel(SettingsRepository(), FakeCameraController(supportsDual = false))
+            runCurrent() // let the startup capability check finish
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SPLIT))
+            assertTrue(vm.state.value.isDualUnavailableOpen)
+            assertEquals(CaptureLayout.SINGLE, vm.state.value.layout)
 
-        vm.onAction(CameraAction.UseSingleCamera)
-        assertFalse(vm.state.value.isDualUnavailableOpen)
-        assertEquals(CaptureLayout.SINGLE, vm.state.value.layout)
-    }
+            vm.onAction(CameraAction.UseSingleCamera)
+            assertFalse(vm.state.value.isDualUnavailableOpen)
+            assertEquals(CaptureLayout.SINGLE, vm.state.value.layout)
+        }
 
     @Test
     fun keepOriginalsIsSharedThroughTheRepository() {
         val repository = SettingsRepository()
-        val vm = CameraViewModel(repository)
+        val vm = CameraViewModel(repository, FakeCameraController())
         val before = repository.settings.value.keepOriginals
         vm.onAction(CameraAction.ToggleKeepOriginals)
         assertEquals(!before, repository.settings.value.keepOriginals)
@@ -182,4 +189,42 @@ class CameraViewModelTest {
             assertFalse(vm.state.value.isLayoutPickerOpen)
             vm.onAction(CameraAction.ShutterClick)
         }
+
+    @Test
+    fun photoShutterSavesThroughTheCameraAndConfirms() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera)
+            vm.onAction(CameraAction.ShutterClick)
+            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_saved), vm.effects.first())
+            assertEquals(1, camera.photosTaken)
+        }
+
+    @Test
+    fun twoSavedFilesShowTheBothPhotosMessage() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController().apply { photoResult = Result.success(listOf(SavedFile("b"), SavedFile("f"))) }
+            val vm = CameraViewModel(SettingsRepository(), camera)
+            vm.onAction(CameraAction.SnapBothPhotos)
+            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photos_saved), vm.effects.first())
+        }
+
+    @Test
+    fun failedPhotoShowsErrorMessage() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController().apply { photoResult = Result.failure(IllegalStateException("disk full")) }
+            val vm = CameraViewModel(SettingsRepository(), camera)
+            vm.onAction(CameraAction.ShutterClick)
+            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_failed), vm.effects.first())
+        }
+
+    @Test
+    fun zoomAndFlashReachTheCamera() {
+        val camera = FakeCameraController()
+        val vm = CameraViewModel(SettingsRepository(), camera)
+        vm.onAction(CameraAction.SelectZoom(2f))
+        vm.onAction(CameraAction.CycleFlash)
+        assertEquals(2f, camera.currentZoom)
+        assertEquals(FLASH.AUTO, camera.currentFlash)
+    }
 }

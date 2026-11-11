@@ -2,6 +2,7 @@ package com.samkit.duet.feature.camera
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.samkit.duet.core.camera.CameraController
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
 import com.samkit.duet.core.model.FLASH
@@ -11,8 +12,9 @@ import com.samkit.duet.core.settings.SettingsRepository
 import com.samkit.duet.core.settings.UserSettings
 import duet.shared.generated.resources.Res
 import duet.shared.generated.resources.msg_back_then_front
-import duet.shared.generated.resources.msg_photo_taken
-import duet.shared.generated.resources.msg_photos_both_taken
+import duet.shared.generated.resources.msg_photo_failed
+import duet.shared.generated.resources.msg_photo_saved
+import duet.shared.generated.resources.msg_photos_saved
 import duet.shared.generated.resources.msg_stop_recording_first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -30,9 +32,10 @@ import kotlin.time.Duration.Companion.seconds
 
 class CameraViewModel(
     private val settingsRepository: SettingsRepository,
-    // Phase 4 passes the real hardware check; flip to false to try the dialog.
-    private val dualCameraSupported: Boolean = true,
+    private val camera: CameraController,
 ) : ViewModel() {
+    // Assume yes until the hardware answers (a few ms after start), so the first tap isn't wrongly blocked.
+    private var dualCameraSupported = true
     private val _state = MutableStateFlow(CameraUiState())
     val state: StateFlow<CameraUiState> = _state.asStateFlow()
 
@@ -44,6 +47,10 @@ class CameraViewModel(
     val effects: Flow<CameraEffect> = _effects.receiveAsFlow()
 
     private var timerJob: Job? = null
+
+    init {
+        viewModelScope.launch { dualCameraSupported = camera.supportsDualCamera() }
+    }
 
     /** The single entry point for user input. */
     fun onAction(action: CameraAction) {
@@ -58,11 +65,17 @@ class CameraViewModel(
                     }
                 }
             CameraAction.ShutterClick -> onShutterClick()
-            CameraAction.SnapBothPhotos -> emit(CameraEffect.ShowMessage(Res.string.msg_photos_both_taken))
+            CameraAction.SnapBothPhotos -> takePhoto()
             CameraAction.SwapCameras -> _state.update { it.copy(mainLens = it.mainLens.other()) }
             is CameraAction.SelectMainLens -> _state.update { it.copy(mainLens = action.lens) }
-            is CameraAction.SelectZoom -> _state.update { it.copy(zoom = action.level) }
-            CameraAction.CycleFlash -> _state.update { it.copy(flash = it.flash.next()) }
+            is CameraAction.SelectZoom -> {
+                _state.update { it.copy(zoom = action.level) }
+                camera.setZoom(action.level)
+            }
+            CameraAction.CycleFlash -> {
+                _state.update { it.copy(flash = it.flash.next()) }
+                camera.setFlash(_state.value.flash)
+            }
             CameraAction.ToggleSplitDirection -> _state.update { it.copy(splitDirection = it.splitDirection.other()) }
             is CameraAction.ChangeSplitRatio ->
                 _state.update { it.copy(splitRatio = action.ratio.coerceIn(MIN_SPLIT_RATIO, MAX_SPLIT_RATIO)) }
@@ -95,7 +108,18 @@ class CameraViewModel(
         when {
             current.isRecording -> stopRecording()
             current.shutterType == CaptureType.VIDEO -> startRecording()
-            else -> emit(CameraEffect.ShowMessage(Res.string.msg_photo_taken))
+            else -> takePhoto()
+        }
+    }
+
+    // Captures every camera on screen: one file in Single, back + front files in the dual layouts.
+    private fun takePhoto() {
+        viewModelScope.launch {
+            camera
+                .takePhoto()
+                .onSuccess { files ->
+                    emit(CameraEffect.ShowMessage(if (files.size > 1) Res.string.msg_photos_saved else Res.string.msg_photo_saved))
+                }.onFailure { emit(CameraEffect.ShowMessage(Res.string.msg_photo_failed)) }
         }
     }
 

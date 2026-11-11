@@ -1,16 +1,15 @@
 package com.samkit.duet.core.camera
 
 import com.samkit.duet.core.model.FLASH
-import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.SavedFile
 import kotlinx.coroutines.flow.StateFlow
 
 interface CameraController {
     val state: StateFlow<CameraState>
 
-    suspend fun bind(lens: LENS)
+    suspend fun supportsDualCamera(): Boolean
 
-    suspend fun takePhoto(): Result<SavedFile>
+    suspend fun takePhoto(): Result<List<SavedFile>>
 
     fun startRecording()
 
