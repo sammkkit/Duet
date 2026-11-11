@@ -3,7 +3,10 @@ package com.samkit.duet.core.permissions
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,7 +25,7 @@ actual fun rememberPermissionState(permission: Permission): PermissionHandle {
     val activity = LocalActivity.current
     val androidPermission = permission.toAndroid()
 
-    val handle = remember(androidPermission) { AndroidPermissionHandle(context.stateOf(androidPermission)) }
+    val handle = remember(androidPermission) { AndroidPermissionHandle(context.stateOf(androidPermission), context) }
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             handle.state =
@@ -44,12 +47,20 @@ private fun Activity?.canAskAgain(permission: String): Boolean = this?.shouldSho
 
 private class AndroidPermissionHandle(
     initial: PermissionState,
+    private val context: Context,
 ) : PermissionHandle {
     override var state: PermissionState by mutableStateOf(initial)
 
     var onRequest: () -> Unit = {}
 
     override fun request() = onRequest()
+
+    override fun openSettings() {
+        val intent =
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
 }
 
 private fun Permission.toAndroid(): String =

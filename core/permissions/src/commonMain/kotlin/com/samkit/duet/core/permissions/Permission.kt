@@ -16,6 +16,8 @@ interface PermissionHandle {
     val state: PermissionState
 
     fun request()
+
+    fun openSettings()
 }
 
 @Composable
