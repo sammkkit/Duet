@@ -1,5 +1,8 @@
 package com.samkit.duet.navigation
 
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -50,6 +53,10 @@ fun DuetNavigation() {
     NavDisplay(
         backStack = backStack,
         onBack = back,
+        // Push: new screen slides in from the right, old one out to the left. Back (incl. predictive swipe): the reverse.
+        transitionSpec = { slideInHorizontally { it } togetherWith slideOutHorizontally { -it } },
+        popTransitionSpec = { slideInHorizontally { -it } togetherWith slideOutHorizontally { it } },
+        predictivePopTransitionSpec = { slideInHorizontally { -it } togetherWith slideOutHorizontally { it } },
         entryProvider =
             entryProvider {
                 entry<CameraKey> {

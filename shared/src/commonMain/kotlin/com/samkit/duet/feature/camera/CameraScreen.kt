@@ -1,5 +1,9 @@
 package com.samkit.duet.feature.camera
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +18,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -49,6 +57,8 @@ fun CameraRoute(
     // The effect collector outlives recompositions; read the latest callbacks, not the ones from the first frame.
     val toSettings by rememberUpdatedState(onNavigateToSettings)
     val toReview by rememberUpdatedState(onNavigateToReview)
+    val haptics = LocalHapticFeedback.current
+    val shutterFlash = remember { Animatable(0f) }
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(viewModel, lifecycleOwner) {
         // Only handle effects while visible; ones sent in the background wait in the channel.
@@ -58,6 +68,13 @@ fun CameraRoute(
                     // launch: don't block later effects while a snackbar is on screen
                     is CameraEffect.ShowMessage -> launch { snackbarHostState.showSnackbar(getString(effect.message)) }
                     CameraEffect.NavigateToSettings -> toSettings()
+                    CameraEffect.Shutter -> {
+                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                        launch {
+                            shutterFlash.snapTo(1f)
+                            shutterFlash.animateTo(0f, tween(durationMillis = 250))
+                        }
+                    }
                     CameraEffect.NavigateToReview -> toReview()
                 }
             }
@@ -69,6 +86,7 @@ fun CameraRoute(
         onAction = viewModel::onAction,
         keepOriginals = settings.keepOriginals,
         snackbarHostState = snackbarHostState,
+        shutterFlash = { shutterFlash.value },
     )
 }
 
@@ -80,6 +98,7 @@ fun CameraScreen(
     modifier: Modifier = Modifier,
     keepOriginals: Boolean = true,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    shutterFlash: () -> Float = { 0f },
 ) {
     Scaffold(
         modifier = modifier,
@@ -95,12 +114,21 @@ fun CameraScreen(
                 TopBarCenter(state, onAction)
             }
 
-            val previewModifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)
-            when (state.layout) {
-                CaptureLayout.SINGLE -> SingleLayout(state, onAction, previewModifier)
-                CaptureLayout.PIP -> PipLayout(state, onAction, previewModifier)
-                CaptureLayout.SPLIT -> SplitLayout(state, onAction, previewModifier)
-                CaptureLayout.SEPARATE -> SeparateLayout(state, onAction, previewModifier)
+            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)) {
+                val previewModifier = Modifier.fillMaxSize()
+                when (state.layout) {
+                    CaptureLayout.SINGLE -> SingleLayout(state, onAction, previewModifier)
+                    CaptureLayout.PIP -> PipLayout(state, onAction, previewModifier)
+                    CaptureLayout.SPLIT -> SplitLayout(state, onAction, previewModifier)
+                    CaptureLayout.SEPARATE -> SeparateLayout(state, onAction, previewModifier)
+                }
+                // Shutter blink. A lambda read in graphicsLayer: animating it redraws, it doesn't recompose.
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = shutterFlash() }
+                        .background(Color.Black),
+                )
             }
 
             CameraBottomBar(state = state, onAction = onAction)

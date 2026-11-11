@@ -8,7 +8,6 @@
     <string name="aspect_ratio_4_3">4:3</string>
     <string name="timer">Timer</string>
     <string name="timer_off">Off</string>
-    <string name="quality_default">1080p · 30 fps</string>
     <string name="split_top_bottom">Top / Bottom</string>
     <string name="split_left_right">Left / Right</string>
     <string name="saving_two_files">Saving 2 files</string>
@@ -79,10 +78,6 @@
     <!-- Settings -->
     <string name="back">Back</string>
     <string name="section_dual">Dual camera</string>
-    <string name="back_quality">Back camera quality</string>
-    <string name="back_quality_value">1080p · 30 fps</string>
-    <string name="front_quality">Front camera quality</string>
-    <string name="front_quality_value">720p · 30 fps</string>
     <string name="audio">Audio</string>
     <string name="audio_value">Phone mic, into every video file</string>
     <string name="keep_originals">Keep originals</string>

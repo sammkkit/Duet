@@ -248,7 +248,7 @@ class CameraXController(
                 ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, "$name.jpg")
                     put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) put(MediaStore.MediaColumns.RELATIVE_PATH, "DCIM/DualCam")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) put(MediaStore.MediaColumns.RELATIVE_PATH, GALLERY_FOLDER)
                 }
             val options =
                 ImageCapture.OutputFileOptions

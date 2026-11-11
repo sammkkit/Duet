@@ -123,6 +123,7 @@ class AVFoundationController : CameraController {
         runCatching {
             val targets = withContext(Dispatchers.Main) { bound.toMap() }
             check(targets.isNotEmpty()) { "No camera is bound" }
+            withContext(Dispatchers.Main) { recentPhotos.clear() }
             val name = "IMG_${timestamp()}"
             val shots =
                 coroutineScope {

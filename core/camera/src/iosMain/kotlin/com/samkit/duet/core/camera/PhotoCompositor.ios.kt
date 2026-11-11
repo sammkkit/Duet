@@ -7,7 +7,9 @@ import com.samkit.duet.core.model.SavedFile
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import platform.CoreGraphics.CGContextRestoreGState
 import platform.CoreGraphics.CGContextSaveGState
 import platform.CoreGraphics.CGRect
@@ -96,21 +98,25 @@ internal suspend fun saveToPhotos(
             PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelAddOnly) { continuation.resume(it) }
         }
     check(status == PHAuthorizationStatusAuthorized || status == PHAuthorizationStatusLimited) { "No Photos access" }
-    return suspendCancellableCoroutine { continuation ->
-        var id = ""
-        PHPhotoLibrary.sharedPhotoLibrary().performChanges(
-            {
-                val request = PHAssetCreationRequest.creationRequestForAsset()
-                val options = PHAssetResourceCreationOptions().apply { originalFilename = "$name.jpg" }
-                request.addResourceWithType(PHAssetResourceTypePhoto, data, options)
-                id = request.placeholderForCreatedAsset?.localIdentifier.orEmpty()
-            },
-        ) { success, error ->
-            if (success) {
-                continuation.resume(SavedFile(id))
-            } else {
-                continuation.resumeWithException(IllegalStateException(error?.localizedDescription ?: "Couldn't save to Photos"))
+    val file =
+        suspendCancellableCoroutine { continuation ->
+            var id = ""
+            PHPhotoLibrary.sharedPhotoLibrary().performChanges(
+                {
+                    val request = PHAssetCreationRequest.creationRequestForAsset()
+                    val options = PHAssetResourceCreationOptions().apply { originalFilename = "$name.jpg" }
+                    request.addResourceWithType(PHAssetResourceTypePhoto, data, options)
+                    id = request.placeholderForCreatedAsset?.localIdentifier.orEmpty()
+                },
+            ) { success, error ->
+                if (success) {
+                    continuation.resume(SavedFile(id))
+                } else {
+                    continuation.resumeWithException(IllegalStateException(error?.localizedDescription ?: "Couldn't save to Photos"))
+                }
             }
         }
-    }
+    // Main thread only, like every other read and write of recentPhotos.
+    withContext(Dispatchers.Main) { recentPhotos[file.id] = data }
+    return file
 }

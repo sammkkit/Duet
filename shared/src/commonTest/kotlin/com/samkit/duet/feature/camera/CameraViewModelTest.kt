@@ -63,11 +63,12 @@ class CameraViewModelTest {
         }
 
     @Test
-    fun shutterInPhotoDoesNotRecordAndShowsMessage() =
+    fun shutterInPhotoBlinksFirstThenShowsMessage() =
         runTest(dispatcher) {
             val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
             vm.onAction(CameraAction.ShutterClick)
             assertFalse(vm.state.value.isRecording)
+            assertEquals(CameraEffect.Shutter, vm.effects.first())
             assertIs<CameraEffect.ShowMessage>(vm.effects.first())
         }
 
@@ -200,7 +201,7 @@ class CameraViewModelTest {
             val camera = FakeCameraController()
             val vm = CameraViewModel(SettingsRepository(), camera)
             vm.onAction(CameraAction.ShutterClick)
-            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_saved), vm.effects.first())
+            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_saved), vm.effects.first { it is CameraEffect.ShowMessage })
             assertEquals(1, camera.photosTaken)
         }
 
@@ -210,7 +211,22 @@ class CameraViewModelTest {
             val camera = FakeCameraController().apply { photoResult = Result.success(listOf(SavedFile("b"), SavedFile("f"))) }
             val vm = CameraViewModel(SettingsRepository(), camera)
             vm.onAction(CameraAction.SnapBothPhotos)
-            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photos_saved), vm.effects.first())
+            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photos_saved), vm.effects.first { it is CameraEffect.ShowMessage })
+        }
+
+    @Test
+    fun thumbnailShowsFirstSavedFileAndSurvivesAFailure() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController().apply { photoResult = Result.success(listOf(SavedFile("merged"), SavedFile("back"))) }
+            val vm = CameraViewModel(SettingsRepository(), camera)
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            assertEquals(SavedFile("merged"), vm.state.value.lastCapture)
+
+            camera.photoResult = Result.failure(IllegalStateException("disk full"))
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            assertEquals(SavedFile("merged"), vm.state.value.lastCapture)
         }
 
     @Test
@@ -219,7 +235,7 @@ class CameraViewModelTest {
             val camera = FakeCameraController().apply { photoResult = Result.failure(IllegalStateException("disk full")) }
             val vm = CameraViewModel(SettingsRepository(), camera)
             vm.onAction(CameraAction.ShutterClick)
-            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_failed), vm.effects.first())
+            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_failed), vm.effects.first { it is CameraEffect.ShowMessage })
         }
 
     @Test

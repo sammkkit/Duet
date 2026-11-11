@@ -117,10 +117,12 @@ class CameraViewModel(
     private fun takePhoto() {
         val composition = _state.value.photoComposition()
         val keepOriginals = settingsRepository.settings.value.keepOriginals
+        emit(CameraEffect.Shutter)
         viewModelScope.launch {
             camera
                 .takePhoto(composition, keepOriginals)
                 .onSuccess { files ->
+                    _state.update { it.copy(lastCapture = files.firstOrNull() ?: it.lastCapture) }
                     val separateFiles = composition == null && files.size > 1
                     emit(CameraEffect.ShowMessage(if (separateFiles) Res.string.msg_photos_saved else Res.string.msg_photo_saved))
                 }.onFailure { emit(CameraEffect.ShowMessage(Res.string.msg_photo_failed)) }

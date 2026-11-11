@@ -35,12 +35,8 @@ import duet.shared.generated.resources.Res
 import duet.shared.generated.resources.audio
 import duet.shared.generated.resources.audio_value
 import duet.shared.generated.resources.back
-import duet.shared.generated.resources.back_quality
-import duet.shared.generated.resources.back_quality_value
 import duet.shared.generated.resources.dual_supported_body
 import duet.shared.generated.resources.dual_supported_title
-import duet.shared.generated.resources.front_quality
-import duet.shared.generated.resources.front_quality_value
 import duet.shared.generated.resources.keep_originals
 import duet.shared.generated.resources.keep_originals_desc
 import duet.shared.generated.resources.mirror_front
@@ -90,8 +86,6 @@ fun SettingsScreen(
             }
 
             SectionHeader(stringResource(Res.string.section_dual))
-            ValueRow(stringResource(Res.string.back_quality), stringResource(Res.string.back_quality_value))
-            ValueRow(stringResource(Res.string.front_quality), stringResource(Res.string.front_quality_value))
             ValueRow(stringResource(Res.string.audio), stringResource(Res.string.audio_value))
             SwitchRow(
                 title = stringResource(Res.string.keep_originals),

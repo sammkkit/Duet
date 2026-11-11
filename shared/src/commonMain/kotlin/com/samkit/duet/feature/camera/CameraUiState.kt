@@ -6,6 +6,7 @@ import com.samkit.duet.core.model.FLASH
 import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.PipCorner
 import com.samkit.duet.core.model.PipShape
+import com.samkit.duet.core.model.SavedFile
 import com.samkit.duet.core.model.SplitDirection
 import kotlin.time.Duration
 
@@ -29,6 +30,8 @@ data class CameraUiState(
     val isLayoutPickerOpen: Boolean = false,
     // Shown when a dual layout is picked on a phone that can't run both cameras.
     val isDualUnavailableOpen: Boolean = false,
+    // Shown in the bottom-left thumbnail. In PiP/Split: the merged photo.
+    val lastCapture: SavedFile? = null,
 ) {
     /** Layout, capture type and separate-mode types are locked while recording. */
     val controlsLocked: Boolean get() = isRecording

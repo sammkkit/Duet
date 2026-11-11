@@ -78,5 +78,8 @@ sealed interface CameraEffect {
 
     data object NavigateToSettings : CameraEffect
 
+    /** A photo is being taken: blink the preview and buzz, like a real camera. */
+    data object Shutter : CameraEffect
+
     data object NavigateToReview : CameraEffect
 }
