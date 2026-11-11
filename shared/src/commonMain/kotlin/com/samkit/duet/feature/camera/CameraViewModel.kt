@@ -92,7 +92,7 @@ class CameraViewModel(
             }
             CameraAction.DismissDualUnavailable -> _state.update { it.copy(isDualUnavailableOpen = false) }
             CameraAction.OpenSettings -> emit(CameraEffect.NavigateToSettings)
-            CameraAction.OpenLastCapture -> emit(CameraEffect.NavigateToReview)
+            CameraAction.OpenLastCapture -> _state.value.lastCapture?.let { emit(CameraEffect.OpenPhoto(it)) }
         }
     }
 

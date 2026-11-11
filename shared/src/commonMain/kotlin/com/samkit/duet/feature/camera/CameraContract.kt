@@ -5,6 +5,7 @@ import com.samkit.duet.core.model.CaptureType
 import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.PipCorner
 import com.samkit.duet.core.model.PipShape
+import com.samkit.duet.core.model.SavedFile
 import org.jetbrains.compose.resources.StringResource
 
 /** Everything the user can do on the camera screen. The UI only ever sends these to CameraViewModel.onAction. */
@@ -82,4 +83,9 @@ sealed interface CameraEffect {
     data object Shutter : CameraEffect
 
     data object NavigateToReview : CameraEffect
+
+    /** Thumbnail tapped: show the last photo in the phone's photo viewer. */
+    data class OpenPhoto(
+        val file: SavedFile,
+    ) : CameraEffect
 }

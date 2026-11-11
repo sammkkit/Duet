@@ -230,6 +230,20 @@ class CameraViewModelTest {
         }
 
     @Test
+    fun thumbnailOpensTheLastPhotoAndDoesNothingBeforeTheFirst() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController().apply { photoResult = Result.success(listOf(SavedFile("p"))) }
+            val vm = CameraViewModel(SettingsRepository(), camera)
+            vm.onAction(CameraAction.OpenLastCapture)
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            vm.onAction(CameraAction.OpenLastCapture)
+            assertEquals(CameraEffect.Shutter, vm.effects.first())
+            vm.effects.first() // "Saved" message
+            assertEquals(CameraEffect.OpenPhoto(SavedFile("p")), vm.effects.first())
+        }
+
+    @Test
     fun failedPhotoShowsErrorMessage() =
         runTest(dispatcher) {
             val camera = FakeCameraController().apply { photoResult = Result.failure(IllegalStateException("disk full")) }

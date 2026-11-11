@@ -28,6 +28,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.samkit.duet.core.camera.rememberPhotoViewer
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
@@ -58,6 +59,7 @@ fun CameraRoute(
     val toSettings by rememberUpdatedState(onNavigateToSettings)
     val toReview by rememberUpdatedState(onNavigateToReview)
     val haptics = LocalHapticFeedback.current
+    val openPhoto by rememberUpdatedState(rememberPhotoViewer())
     val shutterFlash = remember { Animatable(0f) }
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(viewModel, lifecycleOwner) {
@@ -76,6 +78,7 @@ fun CameraRoute(
                         }
                     }
                     CameraEffect.NavigateToReview -> toReview()
+                    is CameraEffect.OpenPhoto -> openPhoto(effect.file)
                 }
             }
         }
