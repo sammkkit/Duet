@@ -18,7 +18,8 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
             extensions.configure<KotlinMultiplatformExtension> {
-                // iOS targets go here once Xcode is installed (see shared/build.gradle.kts).
+                iosArm64()
+                iosSimulatorArm64()
                 (this as ExtensionAware).extensions.configure<KotlinMultiplatformAndroidLibraryTarget>("android") {
                     namespace = "com.samkit.duet" + path.replace(':', '.')
                     // SDK 37+ is installed as "android-37.0": a plain compileSdk = 37 looks for "android-37" and fails sync.
