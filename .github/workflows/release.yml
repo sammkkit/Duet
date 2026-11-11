@@ -19,6 +19,10 @@ jobs:
   release:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
+    # Optional: with these two repo secrets set, the APK is also sent to a Telegram chat. Without them that step skips.
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     permissions:
       contents: write
       actions: read # download the APK from the CI run
@@ -32,7 +36,8 @@ jobs:
           path: apk
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
-      - env:
+      - id: publish
+        env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
@@ -41,6 +46,7 @@ jobs:
 
           if ! gh release view "$base" > /dev/null 2>&1; then
             gh release create "$base" apk/*.apk --target "$SHA" --generate-notes --latest
+            echo "tag=$base" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -51,3 +57,19 @@ jobs:
 
           gh release create "$tag" apk/*.apk --target "$SHA" --prerelease --latest=false \
             --title "$tag" --notes-start-tag "$base" --generate-notes
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # Bot API sendDocument: the APK lands in the chat as a file, one tap to install (50 MB limit; ours is ~17 MB).
+      - name: Send APK to Telegram
+        if: env.TELEGRAM_BOT_TOKEN != ''
+        env:
+          TAG: ${{ steps.publish.outputs.tag }}
+          MESSAGE: ${{ github.event.workflow_run.head_commit.message }}
+        run: |
+          apk=$(ls apk/*.apk | head -1)
+          curl --fail-with-body -sS "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument" \
+            -F chat_id="$TELEGRAM_CHAT_ID" \
+            -F document=@"$apk;filename=Duet-$TAG.apk" \
+            -F caption="Duet $TAG
+          ${MESSAGE%%$'\n'*}
+          https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" > /dev/null
