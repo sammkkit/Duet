@@ -89,7 +89,7 @@
     <string name="mirror_front_desc">Save selfies as you see them</string>
     <string name="section_storage">Storage</string>
     <string name="save_to">Save to</string>
-    <string name="save_to_value">Pictures / DualCam</string>
+    <string name="save_to_value">Camera roll, with your other photos</string>
     <string name="dual_supported_title">This device supports dual camera</string>
     <string name="dual_supported_body">Both cameras can run together up to [MAX BACK] + [MAX FRONT]. Higher settings switch you to Single.</string>
 
