@@ -7,6 +7,7 @@ kotlin {
         api(project(":core:model"))
         api(libs.kotlinx.coroutines.core)
         api(libs.koin.core)
+        implementation(libs.koin.compose)
     }
     sourceSets.androidMain.dependencies {
         implementation(libs.camerax.core)
@@ -14,7 +15,6 @@ kotlin {
         implementation(libs.camerax.lifecycle)
         implementation(libs.camerax.video)
         implementation(libs.camerax.view)
-        implementation(libs.koin.compose)
         implementation(libs.androidx.lifecycle.runtimeCompose)
     }
 }

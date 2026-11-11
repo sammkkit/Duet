@@ -1,25 +1,32 @@
 package com.samkit.duet.feature.camera
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.samkit.duet.core.camera.rememberPhotoViewer
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
@@ -28,7 +35,6 @@ import com.samkit.duet.feature.camera.layouts.SeparateLayout
 import com.samkit.duet.feature.camera.layouts.SingleLayout
 import com.samkit.duet.feature.camera.layouts.SplitLayout
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Duration.Companion.seconds
 
@@ -44,21 +50,29 @@ fun CameraRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // The effect collector outlives recompositions; read the latest callbacks, not the ones from the first frame.
     val toSettings by rememberUpdatedState(onNavigateToSettings)
     val toReview by rememberUpdatedState(onNavigateToReview)
+    val haptics = LocalHapticFeedback.current
+    val openPhoto by rememberUpdatedState(rememberPhotoViewer())
+    val shutterFlash = remember { Animatable(0f) }
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(viewModel, lifecycleOwner) {
         // Only handle effects while visible; ones sent in the background wait in the channel.
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.effects.collect { effect ->
                 when (effect) {
-                    // launch: don't block later effects while a snackbar is on screen
-                    is CameraEffect.ShowMessage -> launch { snackbarHostState.showSnackbar(getString(effect.message)) }
                     CameraEffect.NavigateToSettings -> toSettings()
+                    CameraEffect.Shutter -> {
+                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                        launch {
+                            shutterFlash.snapTo(1f)
+                            shutterFlash.animateTo(0f, tween(durationMillis = 250))
+                        }
+                    }
                     CameraEffect.NavigateToReview -> toReview()
+                    is CameraEffect.OpenPhoto -> openPhoto(effect.file)
                 }
             }
         }
@@ -68,7 +82,7 @@ fun CameraRoute(
         state = state,
         onAction = viewModel::onAction,
         keepOriginals = settings.keepOriginals,
-        snackbarHostState = snackbarHostState,
+        shutterFlash = { shutterFlash.value },
     )
 }
 
@@ -79,12 +93,11 @@ fun CameraScreen(
     onAction: (CameraAction) -> Unit,
     modifier: Modifier = Modifier,
     keepOriginals: Boolean = true,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    shutterFlash: () -> Float = { 0f },
 ) {
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { insets ->
         Column(Modifier.fillMaxSize().padding(insets)) {
             CameraTopBar(
@@ -95,12 +108,21 @@ fun CameraScreen(
                 TopBarCenter(state, onAction)
             }
 
-            val previewModifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)
-            when (state.layout) {
-                CaptureLayout.SINGLE -> SingleLayout(state, onAction, previewModifier)
-                CaptureLayout.PIP -> PipLayout(state, onAction, previewModifier)
-                CaptureLayout.SPLIT -> SplitLayout(state, onAction, previewModifier)
-                CaptureLayout.SEPARATE -> SeparateLayout(state, onAction, previewModifier)
+            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)) {
+                val previewModifier = Modifier.fillMaxSize()
+                when (state.layout) {
+                    CaptureLayout.SINGLE -> SingleLayout(state, onAction, previewModifier)
+                    CaptureLayout.PIP -> PipLayout(state, onAction, previewModifier)
+                    CaptureLayout.SPLIT -> SplitLayout(state, onAction, previewModifier)
+                    CaptureLayout.SEPARATE -> SeparateLayout(state, onAction, previewModifier)
+                }
+                // Shutter blink. A lambda read in graphicsLayer: animating it redraws, it doesn't recompose.
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = shutterFlash() }
+                        .background(Color.Black),
+                )
             }
 
             CameraBottomBar(state = state, onAction = onAction)

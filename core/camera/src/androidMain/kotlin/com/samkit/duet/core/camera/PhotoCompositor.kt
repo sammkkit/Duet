@@ -28,6 +28,9 @@ import kotlin.math.roundToInt
 // Concurrent cameras already stream small frames; this caps memory if a phone hands back full-size photos.
 private const val MAX_EDGE = 2048
 
+// Same folder as the phone's own camera app, so photos show up in the normal Camera album.
+internal const val GALLERY_FOLDER = "DCIM/Camera"
+
 /** Takes a photo into memory (not a file), upright, as a Bitmap. Decoding runs off the camera thread. */
 internal suspend fun ImageCapture.captureBitmap(): Bitmap =
     suspendCancellableCoroutine { continuation ->
@@ -114,7 +117,7 @@ private fun Bitmap.rotated(degrees: Int): Bitmap {
     return rotated
 }
 
-/** Saves a JPEG to DCIM/DualCam. IS_PENDING hides the half-written file from the gallery until it's complete. */
+/** Saves a JPEG to DCIM/Camera. IS_PENDING hides the half-written file from the gallery until it's complete. */
 internal suspend fun Context.saveBitmapToGallery(
     bitmap: Bitmap,
     name: String,
@@ -125,7 +128,7 @@ internal suspend fun Context.saveBitmapToGallery(
                 put(MediaStore.MediaColumns.DISPLAY_NAME, "$name.jpg")
                 put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "DCIM/DualCam")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, GALLERY_FOLDER)
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
             }

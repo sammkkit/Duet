@@ -1,5 +1,6 @@
 package com.samkit.duet.feature.camera
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,16 +19,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.samkit.duet.core.camera.rememberThumbnail
 import com.samkit.duet.core.designsystem.components.CircleIconButton
 import com.samkit.duet.core.designsystem.components.CircleIconButtonDefaults
 import com.samkit.duet.core.designsystem.icons.DuetIcons
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.LENS
+import com.samkit.duet.core.model.SavedFile
 import com.samkit.duet.core.ui.CaptureTypeToggle
 import com.samkit.duet.core.ui.ModeTabs
 import com.samkit.duet.core.ui.ShutterButton
@@ -72,7 +76,7 @@ internal fun CameraBottomBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LastCaptureThumbnail(onClick = { onAction(CameraAction.OpenLastCapture) })
+            LastCaptureThumbnail(state.lastCapture, onClick = { onAction(CameraAction.OpenLastCapture) })
             ShutterButton(
                 captureType = state.shutterType,
                 isRecording = state.isRecording,
@@ -126,7 +130,10 @@ private fun SecondaryButton(
 }
 
 @Composable
-private fun LastCaptureThumbnail(onClick: () -> Unit) {
+private fun LastCaptureThumbnail(
+    file: SavedFile?,
+    onClick: () -> Unit,
+) {
     val shape = MaterialTheme.shapes.medium
     val description = stringResource(Res.string.open_last_capture)
     Box(
@@ -137,5 +144,10 @@ private fun LastCaptureThumbnail(onClick: () -> Unit) {
             .border(2.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
-    )
+    ) {
+        val thumbnail = file?.let { rememberThumbnail(it) }
+        if (thumbnail != null) {
+            Image(thumbnail, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        }
+    }
 }

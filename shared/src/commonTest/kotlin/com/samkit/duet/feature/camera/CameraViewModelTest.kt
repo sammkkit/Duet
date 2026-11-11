@@ -10,10 +10,6 @@ import com.samkit.duet.core.model.PipShape
 import com.samkit.duet.core.model.SavedFile
 import com.samkit.duet.core.model.SplitDirection
 import com.samkit.duet.core.settings.SettingsRepository
-import duet.shared.generated.resources.Res
-import duet.shared.generated.resources.msg_photo_failed
-import duet.shared.generated.resources.msg_photo_saved
-import duet.shared.generated.resources.msg_photos_saved
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -28,7 +24,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -63,12 +58,12 @@ class CameraViewModelTest {
         }
 
     @Test
-    fun shutterInPhotoDoesNotRecordAndShowsMessage() =
+    fun shutterInPhotoBlinksAndDoesNotRecord() =
         runTest(dispatcher) {
             val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
             vm.onAction(CameraAction.ShutterClick)
             assertFalse(vm.state.value.isRecording)
-            assertIs<CameraEffect.ShowMessage>(vm.effects.first())
+            assertEquals(CameraEffect.Shutter, vm.effects.first())
         }
 
     @Test
@@ -109,7 +104,6 @@ class CameraViewModelTest {
             vm.onAction(CameraAction.SelectCaptureType(CaptureType.PHOTO))
             assertEquals(CaptureLayout.SINGLE, vm.state.value.layout)
             assertEquals(CaptureType.VIDEO, vm.state.value.captureType)
-            assertIs<CameraEffect.ShowMessage>(vm.effects.first())
             vm.onAction(CameraAction.ShutterClick)
         }
 
@@ -195,31 +189,41 @@ class CameraViewModelTest {
         }
 
     @Test
-    fun photoShutterSavesThroughTheCameraAndConfirms() =
+    fun photoShutterSavesThroughTheCamera() =
         runTest(dispatcher) {
             val camera = FakeCameraController()
             val vm = CameraViewModel(SettingsRepository(), camera)
             vm.onAction(CameraAction.ShutterClick)
-            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_saved), vm.effects.first())
+            runCurrent()
             assertEquals(1, camera.photosTaken)
         }
 
     @Test
-    fun twoSavedFilesShowTheBothPhotosMessage() =
+    fun thumbnailShowsFirstSavedFileAndSurvivesAFailure() =
         runTest(dispatcher) {
-            val camera = FakeCameraController().apply { photoResult = Result.success(listOf(SavedFile("b"), SavedFile("f"))) }
+            val camera = FakeCameraController().apply { photoResult = Result.success(listOf(SavedFile("merged"), SavedFile("back"))) }
             val vm = CameraViewModel(SettingsRepository(), camera)
-            vm.onAction(CameraAction.SnapBothPhotos)
-            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photos_saved), vm.effects.first())
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            assertEquals(SavedFile("merged"), vm.state.value.lastCapture)
+
+            camera.photoResult = Result.failure(IllegalStateException("disk full"))
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            assertEquals(SavedFile("merged"), vm.state.value.lastCapture)
         }
 
     @Test
-    fun failedPhotoShowsErrorMessage() =
+    fun thumbnailOpensTheLastPhotoAndDoesNothingBeforeTheFirst() =
         runTest(dispatcher) {
-            val camera = FakeCameraController().apply { photoResult = Result.failure(IllegalStateException("disk full")) }
+            val camera = FakeCameraController().apply { photoResult = Result.success(listOf(SavedFile("p"))) }
             val vm = CameraViewModel(SettingsRepository(), camera)
+            vm.onAction(CameraAction.OpenLastCapture)
             vm.onAction(CameraAction.ShutterClick)
-            assertEquals(CameraEffect.ShowMessage(Res.string.msg_photo_failed), vm.effects.first())
+            runCurrent()
+            vm.onAction(CameraAction.OpenLastCapture)
+            assertEquals(CameraEffect.Shutter, vm.effects.first())
+            assertEquals(CameraEffect.OpenPhoto(SavedFile("p")), vm.effects.first())
         }
 
     @Test

@@ -5,7 +5,7 @@ import com.samkit.duet.core.model.CaptureType
 import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.PipCorner
 import com.samkit.duet.core.model.PipShape
-import org.jetbrains.compose.resources.StringResource
+import com.samkit.duet.core.model.SavedFile
 
 /** Everything the user can do on the camera screen. The UI only ever sends these to CameraViewModel.onAction. */
 sealed interface CameraAction {
@@ -69,14 +69,17 @@ sealed interface CameraAction {
     data object OpenLastCapture : CameraAction
 }
 
-/** One-off things the UI must do once (not state to redraw): show a message, navigate. */
+/** One-off things the UI must do once (not state to redraw): navigate, blink, open a photo. */
 sealed interface CameraEffect {
-    // A resource, not text: the ViewModel has no Compose context to pick the user's language.
-    data class ShowMessage(
-        val message: StringResource,
-    ) : CameraEffect
-
     data object NavigateToSettings : CameraEffect
 
+    /** A photo is being taken: blink the preview and buzz, like a real camera. */
+    data object Shutter : CameraEffect
+
     data object NavigateToReview : CameraEffect
+
+    /** Thumbnail tapped: show the last photo in the phone's photo viewer. */
+    data class OpenPhoto(
+        val file: SavedFile,
+    ) : CameraEffect
 }

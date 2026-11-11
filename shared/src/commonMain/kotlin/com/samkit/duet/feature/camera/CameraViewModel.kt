@@ -11,12 +11,6 @@ import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.SplitDirection
 import com.samkit.duet.core.settings.SettingsRepository
 import com.samkit.duet.core.settings.UserSettings
-import duet.shared.generated.resources.Res
-import duet.shared.generated.resources.msg_back_then_front
-import duet.shared.generated.resources.msg_photo_failed
-import duet.shared.generated.resources.msg_photo_saved
-import duet.shared.generated.resources.msg_photos_saved
-import duet.shared.generated.resources.msg_stop_recording_first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -86,13 +80,14 @@ class CameraViewModel(
             CameraAction.OpenLayoutPicker -> updateUnlessLocked { it.copy(isLayoutPickerOpen = true) }
             CameraAction.DismissLayoutPicker -> _state.update { it.copy(isLayoutPickerOpen = false) }
             CameraAction.UseSingleCamera -> _state.update { it.copy(layout = CaptureLayout.SINGLE, isDualUnavailableOpen = false) }
-            CameraAction.CaptureBackThenFront -> {
-                _state.update { it.copy(isDualUnavailableOpen = false) }
-                emit(CameraEffect.ShowMessage(Res.string.msg_back_then_front))
-            }
-            CameraAction.DismissDualUnavailable -> _state.update { it.copy(isDualUnavailableOpen = false) }
+            CameraAction.CaptureBackThenFront, CameraAction.DismissDualUnavailable ->
+                _state.update {
+                    it.copy(
+                        isDualUnavailableOpen = false,
+                    )
+                }
             CameraAction.OpenSettings -> emit(CameraEffect.NavigateToSettings)
-            CameraAction.OpenLastCapture -> emit(CameraEffect.NavigateToReview)
+            CameraAction.OpenLastCapture -> _state.value.lastCapture?.let { emit(CameraEffect.OpenPhoto(it)) }
         }
     }
 
@@ -117,13 +112,11 @@ class CameraViewModel(
     private fun takePhoto() {
         val composition = _state.value.photoComposition()
         val keepOriginals = settingsRepository.settings.value.keepOriginals
+        emit(CameraEffect.Shutter)
         viewModelScope.launch {
             camera
                 .takePhoto(composition, keepOriginals)
-                .onSuccess { files ->
-                    val separateFiles = composition == null && files.size > 1
-                    emit(CameraEffect.ShowMessage(if (separateFiles) Res.string.msg_photos_saved else Res.string.msg_photo_saved))
-                }.onFailure { emit(CameraEffect.ShowMessage(Res.string.msg_photo_failed)) }
+                .onSuccess { files -> _state.update { it.copy(lastCapture = files.firstOrNull() ?: it.lastCapture) } }
         }
     }
 
@@ -147,11 +140,7 @@ class CameraViewModel(
     }
 
     private fun updateUnlessLocked(transform: (CameraUiState) -> CameraUiState) {
-        if (_state.value.controlsLocked) {
-            emit(CameraEffect.ShowMessage(Res.string.msg_stop_recording_first))
-        } else {
-            _state.update(transform)
-        }
+        if (!_state.value.controlsLocked) _state.update(transform)
     }
 
     private fun emit(effect: CameraEffect) {

@@ -30,7 +30,6 @@ import duet.shared.generated.resources.change_layout
 import duet.shared.generated.resources.flash_auto
 import duet.shared.generated.resources.flash_off
 import duet.shared.generated.resources.flash_on
-import duet.shared.generated.resources.quality_default
 import duet.shared.generated.resources.saving_two_files
 import duet.shared.generated.resources.settings
 import duet.shared.generated.resources.split_left_right
@@ -106,8 +105,7 @@ internal fun TopBarCenter(
                     leading = { Icon(DuetIcons.Timer, contentDescription = stringResource(Res.string.timer), Modifier.size(16.dp)) },
                 )
             }
-        CaptureLayout.PIP ->
-            if (state.isRecording) RecordingPill(elapsed = state.elapsed) else InfoPill(text = stringResource(Res.string.quality_default))
+        CaptureLayout.PIP -> if (state.isRecording) RecordingPill(elapsed = state.elapsed)
         CaptureLayout.SPLIT -> SplitDirectionButton(state.splitDirection) { onAction(CameraAction.ToggleSplitDirection) }
         CaptureLayout.SEPARATE ->
             InfoPill(text = stringResource(Res.string.saving_two_files), leading = {
