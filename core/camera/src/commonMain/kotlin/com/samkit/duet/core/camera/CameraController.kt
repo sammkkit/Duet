@@ -9,7 +9,14 @@ interface CameraController {
 
     suspend fun supportsDualCamera(): Boolean
 
-    suspend fun takePhoto(): Result<List<SavedFile>>
+    /**
+     * Captures every camera on screen. With [composition] and two cameras: one merged photo
+     * (plus each camera's own photo if [keepOriginals]). Without it: one photo per camera.
+     */
+    suspend fun takePhoto(
+        composition: PhotoComposition? = null,
+        keepOriginals: Boolean = false,
+    ): Result<List<SavedFile>>
 
     fun startRecording()
 

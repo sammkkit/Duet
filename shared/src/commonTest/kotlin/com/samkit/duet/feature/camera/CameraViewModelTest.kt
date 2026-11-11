@@ -1,10 +1,14 @@
 package com.samkit.duet.feature.camera
 
+import com.samkit.duet.core.camera.PhotoComposition
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
 import com.samkit.duet.core.model.FLASH
 import com.samkit.duet.core.model.LENS
+import com.samkit.duet.core.model.PipCorner
+import com.samkit.duet.core.model.PipShape
 import com.samkit.duet.core.model.SavedFile
+import com.samkit.duet.core.model.SplitDirection
 import com.samkit.duet.core.settings.SettingsRepository
 import duet.shared.generated.resources.Res
 import duet.shared.generated.resources.msg_photo_failed
@@ -227,4 +231,36 @@ class CameraViewModelTest {
         assertEquals(2f, camera.currentZoom)
         assertEquals(FLASH.AUTO, camera.currentFlash)
     }
+
+    @Test
+    fun pipPhotoAsksForAMergedPhotoMatchingTheScreen() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera)
+            runCurrent()
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.PIP))
+            vm.onAction(CameraAction.ChangePipCorner(PipCorner.BottomStart))
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            assertEquals(PhotoComposition.Pip(LENS.BACK, PipCorner.BottomStart, PipShape.ROUNDED), camera.lastComposition)
+            assertTrue(camera.lastKeepOriginals) // UserSettings default
+        }
+
+    @Test
+    fun splitPhotoUsesCurrentRatioAndSeparateDoesNotMerge() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera)
+            runCurrent()
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SPLIT))
+            vm.onAction(CameraAction.ChangeSplitRatio(0.6f))
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            assertEquals(PhotoComposition.Split(LENS.BACK, SplitDirection.TopBottom, 0.6f), camera.lastComposition)
+
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SEPARATE))
+            vm.onAction(CameraAction.SnapBothPhotos)
+            runCurrent()
+            assertEquals(null, camera.lastComposition)
+        }
 }

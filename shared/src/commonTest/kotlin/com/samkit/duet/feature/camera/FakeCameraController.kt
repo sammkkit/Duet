@@ -2,6 +2,7 @@ package com.samkit.duet.feature.camera
 
 import com.samkit.duet.core.camera.CameraController
 import com.samkit.duet.core.camera.CameraState
+import com.samkit.duet.core.camera.PhotoComposition
 import com.samkit.duet.core.model.FLASH
 import com.samkit.duet.core.model.SavedFile
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,8 +21,16 @@ class FakeCameraController(
 
     override suspend fun supportsDualCamera() = supportsDual
 
-    override suspend fun takePhoto(): Result<List<SavedFile>> {
+    var lastComposition: PhotoComposition? = null
+    var lastKeepOriginals = false
+
+    override suspend fun takePhoto(
+        composition: PhotoComposition?,
+        keepOriginals: Boolean,
+    ): Result<List<SavedFile>> {
         photosTaken++
+        lastComposition = composition
+        lastKeepOriginals = keepOriginals
         return photoResult
     }
 

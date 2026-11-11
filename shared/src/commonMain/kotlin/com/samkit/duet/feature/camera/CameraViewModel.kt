@@ -3,6 +3,7 @@ package com.samkit.duet.feature.camera
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.samkit.duet.core.camera.CameraController
+import com.samkit.duet.core.camera.PhotoComposition
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
 import com.samkit.duet.core.model.FLASH
@@ -114,11 +115,14 @@ class CameraViewModel(
 
     // Captures every camera on screen: one file in Single, back + front files in the dual layouts.
     private fun takePhoto() {
+        val composition = _state.value.photoComposition()
+        val keepOriginals = settingsRepository.settings.value.keepOriginals
         viewModelScope.launch {
             camera
-                .takePhoto()
+                .takePhoto(composition, keepOriginals)
                 .onSuccess { files ->
-                    emit(CameraEffect.ShowMessage(if (files.size > 1) Res.string.msg_photos_saved else Res.string.msg_photo_saved))
+                    val separateFiles = composition == null && files.size > 1
+                    emit(CameraEffect.ShowMessage(if (separateFiles) Res.string.msg_photos_saved else Res.string.msg_photo_saved))
                 }.onFailure { emit(CameraEffect.ShowMessage(Res.string.msg_photo_failed)) }
         }
     }
@@ -164,4 +168,12 @@ private fun FLASH.next() =
         FLASH.AUTO -> FLASH.ON
         FLASH.ON -> FLASH.OFF
         FLASH.OFF -> FLASH.AUTO
+    }
+
+/** Video call and Split save one merged photo that looks like the screen; Single and Separate don't merge. */
+private fun CameraUiState.photoComposition(): PhotoComposition? =
+    when (layout) {
+        CaptureLayout.PIP -> PhotoComposition.Pip(mainLens, pipCorner, pipShape)
+        CaptureLayout.SPLIT -> PhotoComposition.Split(mainLens, splitDirection, splitRatio)
+        CaptureLayout.SINGLE, CaptureLayout.SEPARATE -> null
     }

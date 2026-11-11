@@ -97,19 +97,57 @@ class CameraXController(
             }
         }
 
-    override suspend fun takePhoto(): Result<List<SavedFile>> =
+    override suspend fun takePhoto(
+        composition: PhotoComposition?,
+        keepOriginals: Boolean,
+    ): Result<List<SavedFile>> =
         runCatching {
             val targets = withContext(Dispatchers.Main) { slots.filterKeys { it in bound } }
             check(targets.isNotEmpty()) { "No camera is bound" }
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            if (composition != null && targets.size == 2) {
+                takeComposedPhoto(targets, composition, keepOriginals, "IMG_$stamp")
+            } else {
+                coroutineScope {
+                    targets
+                        .map { (lens, slot) ->
+                            val suffix = if (targets.size > 1) "_${lens.name.lowercase()}" else ""
+                            async { slot.imageCapture.saveToGallery("IMG_$stamp$suffix") }
+                        }.awaitAll()
+                }
+            }
+        }
+
+    // Both cameras into memory at once, merged like the screen shows them, saved as one photo.
+    private suspend fun takeComposedPhoto(
+        targets: Map<LENS, Slot>,
+        composition: PhotoComposition,
+        keepOriginals: Boolean,
+        name: String,
+    ): List<SavedFile> {
+        val shots =
             coroutineScope {
                 targets
                     .map { (lens, slot) ->
-                        val suffix = if (targets.size > 1) "_${lens.name.lowercase()}" else ""
-                        async { slot.imageCapture.saveToGallery("IMG_$stamp$suffix") }
+                        async { lens to slot.imageCapture.captureBitmap() }
                     }.awaitAll()
+                    .toMap()
             }
+        try {
+            val merged = withContext(Dispatchers.Default) { composePhoto(shots, composition) }
+            val files = mutableListOf(context.saveBitmapToGallery(merged, name))
+            merged.recycle()
+            if (keepOriginals) {
+                shots.forEach { (lens, bitmap) ->
+                    files +=
+                        context.saveBitmapToGallery(bitmap, "${name}_${lens.name.lowercase()}")
+                }
+            }
+            return files
+        } finally {
+            shots.values.forEach { it.recycle() }
         }
+    }
 
     override fun startRecording(): Unit = TODO("#13 video recording")
 
