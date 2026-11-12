@@ -16,10 +16,12 @@ import platform.CoreGraphics.CGRect
 import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGSizeMake
 import platform.Foundation.NSData
+import platform.Foundation.NSURL
 import platform.Photos.PHAccessLevelAddOnly
 import platform.Photos.PHAssetCreationRequest
 import platform.Photos.PHAssetResourceCreationOptions
 import platform.Photos.PHAssetResourceTypePhoto
+import platform.Photos.PHAssetResourceTypeVideo
 import platform.Photos.PHAuthorizationStatusAuthorized
 import platform.Photos.PHAuthorizationStatusLimited
 import platform.Photos.PHPhotoLibrary
@@ -93,30 +95,41 @@ internal suspend fun saveToPhotos(
     data: NSData,
     name: String,
 ): SavedFile {
+    val file = saveAsset("$name.jpg") { request, options -> request.addResourceWithType(PHAssetResourceTypePhoto, data, options) }
+    // Main thread only, like every other read and write of recentPhotos.
+    withContext(Dispatchers.Main) { recentPhotos[file.id] = data }
+    return file
+}
+
+/** Copies a recorded movie into the Photos library. */
+internal suspend fun saveVideoToPhotos(
+    file: NSURL,
+    name: String,
+): SavedFile = saveAsset("$name.mov") { request, options -> request.addResourceWithType(PHAssetResourceTypeVideo, file, options) }
+
+private suspend fun saveAsset(
+    fileName: String,
+    addResource: (PHAssetCreationRequest, PHAssetResourceCreationOptions) -> Unit,
+): SavedFile {
     val status =
         suspendCancellableCoroutine { continuation ->
             PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelAddOnly) { continuation.resume(it) }
         }
     check(status == PHAuthorizationStatusAuthorized || status == PHAuthorizationStatusLimited) { "No Photos access" }
-    val file =
-        suspendCancellableCoroutine { continuation ->
-            var id = ""
-            PHPhotoLibrary.sharedPhotoLibrary().performChanges(
-                {
-                    val request = PHAssetCreationRequest.creationRequestForAsset()
-                    val options = PHAssetResourceCreationOptions().apply { originalFilename = "$name.jpg" }
-                    request.addResourceWithType(PHAssetResourceTypePhoto, data, options)
-                    id = request.placeholderForCreatedAsset?.localIdentifier.orEmpty()
-                },
-            ) { success, error ->
-                if (success) {
-                    continuation.resume(SavedFile(id))
-                } else {
-                    continuation.resumeWithException(IllegalStateException(error?.localizedDescription ?: "Couldn't save to Photos"))
-                }
+    return suspendCancellableCoroutine { continuation ->
+        var id = ""
+        PHPhotoLibrary.sharedPhotoLibrary().performChanges(
+            {
+                val request = PHAssetCreationRequest.creationRequestForAsset()
+                addResource(request, PHAssetResourceCreationOptions().apply { originalFilename = fileName })
+                id = request.placeholderForCreatedAsset?.localIdentifier.orEmpty()
+            },
+        ) { success, error ->
+            if (success) {
+                continuation.resume(SavedFile(id))
+            } else {
+                continuation.resumeWithException(IllegalStateException(error?.localizedDescription ?: "Couldn't save to Photos"))
             }
         }
-    // Main thread only, like every other read and write of recentPhotos.
-    withContext(Dispatchers.Main) { recentPhotos[file.id] = data }
-    return file
+    }
 }

@@ -5,9 +5,6 @@
     <string name="flash_off">Flash off</string>
     <string name="change_layout">Change layout</string>
     <string name="settings">Settings</string>
-    <string name="aspect_ratio_4_3">4:3</string>
-    <string name="timer">Timer</string>
-    <string name="timer_off">Off</string>
     <string name="split_top_bottom">Top / Bottom</string>
     <string name="split_left_right">Left / Right</string>
     <string name="saving_two_files">Saving 2 files</string>
@@ -20,15 +17,9 @@
     <string name="swap_top_bottom">Swap top and bottom</string>
     <string name="swap_left_right">Swap left and right</string>
     <string name="drag_split">Drag to resize split</string>
-    <string name="back_photo">Back camera: photo</string>
-    <string name="back_video">Back camera: video</string>
-    <string name="front_photo">Front camera: photo</string>
-    <string name="front_video">Front camera: video</string>
 
     <!-- Camera: bottom bar -->
-    <string name="separate_hint">Each camera records on its own — set photo or video per camera</string>
-    <string name="snap_both">Snap a photo from both cameras</string>
-    <string name="pause_recording">Pause recording</string>
+    <string name="dual_photo_hint">Photos only in this layout · video in Single</string>
     <string name="switch_to_back">Switch to back camera</string>
     <string name="switch_to_front">Switch to front camera</string>
     <string name="open_last_capture">Open last capture</string>
@@ -66,42 +57,14 @@
 
     <!-- Dual camera unavailable dialog -->
     <string name="dual_unavailable_title">Dual camera isn't available</string>
-    <string name="dual_unavailable_body">This phone can't run the back and front cameras at the same time. You can use Single mode, or capture back then front, one right after the other.</string>
-    <string name="back_then_front">Back then front</string>
+    <string name="dual_unavailable_body">This phone can't run the back and front cameras at the same time. Use Single mode instead.</string>
     <string name="use_single">Use single camera</string>
 
     <!-- Settings -->
     <string name="back">Back</string>
     <string name="section_dual">Dual camera</string>
-    <string name="audio">Audio</string>
-    <string name="audio_value">Phone mic, into every video file</string>
     <string name="keep_originals">Keep originals</string>
     <string name="keep_originals_desc">Save each camera as its own file in Video call and Split</string>
-    <string name="section_photo">Photo</string>
-    <string name="photo_format">Format</string>
-    <string name="photo_format_value">JPEG</string>
-    <string name="mirror_front">Mirror front camera</string>
-    <string name="mirror_front_desc">Save selfies as you see them</string>
-    <string name="section_storage">Storage</string>
-    <string name="save_to">Save to</string>
-    <string name="save_to_value">Camera roll, with your other photos</string>
-    <string name="dual_supported_title">This device supports dual camera</string>
-    <string name="dual_supported_body">Both cameras can run together up to [MAX BACK] + [MAX FRONT]. Higher settings switch you to Single.</string>
 
     <!-- Review -->
-    <string name="back_to_camera">Back to camera</string>
-    <string name="review_title">Video call capture</string>
-    <string name="review_time">Today, 6:42 PM</string>
-    <string name="more_options">More options</string>
-    <string name="play_video">Play video</string>
-    <string name="files_header">Files from this capture</string>
-    <string name="file_combined">Combined video</string>
-    <string name="file_combined_desc">Video call layout · 1080p</string>
-    <string name="badge_main">MAIN</string>
-    <string name="file_back">Back camera</string>
-    <string name="file_back_desc">Original · 1080p</string>
-    <string name="file_front">Front camera</string>
-    <string name="file_front_desc">Original · 720p</string>
-    <string name="share">Share</string>
-    <string name="delete_capture">Delete capture</string>
 </resources>

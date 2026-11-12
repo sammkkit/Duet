@@ -23,9 +23,6 @@ data class CameraUiState(
     val pipCorner: PipCorner = PipCorner.TopEnd,
     val splitRatio: Float = 0.5f,
     val splitDirection: SplitDirection = SplitDirection.TopBottom,
-    // Separate mode: each camera picks photo or video on its own.
-    val backType: CaptureType = CaptureType.VIDEO,
-    val frontType: CaptureType = CaptureType.PHOTO,
     val pipShape: PipShape = PipShape.ROUNDED,
     val isLayoutPickerOpen: Boolean = false,
     // Shown when a dual layout is picked on a phone that can't run both cameras.
@@ -36,14 +33,9 @@ data class CameraUiState(
     /** Layout, capture type and separate-mode types are locked while recording. */
     val controlsLocked: Boolean get() = isRecording
 
-    /** What the shutter does. Separate mode records if either camera is set to video. */
+    /** What the shutter does. Video is Single-only for now: merging two live cameras into one video is Phase 5. */
     val shutterType: CaptureType
-        get() =
-            when {
-                layout != CaptureLayout.SEPARATE -> captureType
-                backType == CaptureType.VIDEO || frontType == CaptureType.VIDEO -> CaptureType.VIDEO
-                else -> CaptureType.PHOTO
-            }
+        get() = if (layout == CaptureLayout.SINGLE) captureType else CaptureType.PHOTO
 }
 
 const val MIN_SPLIT_RATIO = 0.3f

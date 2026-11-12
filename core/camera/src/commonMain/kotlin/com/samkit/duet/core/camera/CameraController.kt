@@ -18,8 +18,10 @@ interface CameraController {
         keepOriginals: Boolean = false,
     ): Result<List<SavedFile>>
 
+    /** Single camera only. Records with sound when the mic permission is granted; progress arrives as [CameraState.Recording]. */
     fun startRecording()
 
+    /** Stops and saves the video. Also returns the file when the camera already ended it (app backgrounded, interrupted). */
     suspend fun stopRecording(): Result<SavedFile>
 
     fun setZoom(ratio: Float)

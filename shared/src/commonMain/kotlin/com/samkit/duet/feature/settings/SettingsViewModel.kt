@@ -7,8 +7,6 @@ import kotlinx.coroutines.flow.StateFlow
 
 sealed interface SettingsAction {
     data object ToggleKeepOriginals : SettingsAction
-
-    data object ToggleMirrorFront : SettingsAction
 }
 
 class SettingsViewModel(
@@ -19,7 +17,6 @@ class SettingsViewModel(
     fun onAction(action: SettingsAction) {
         when (action) {
             SettingsAction.ToggleKeepOriginals -> repository.update { it.copy(keepOriginals = !it.keepOriginals) }
-            SettingsAction.ToggleMirrorFront -> repository.update { it.copy(mirrorFrontCamera = !it.mirrorFrontCamera) }
         }
     }
 }

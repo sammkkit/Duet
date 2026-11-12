@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.update
 /** User preferences that more than one screen reads (camera sheet + Settings). */
 data class UserSettings(
     val keepOriginals: Boolean = true,
-    val mirrorFrontCamera: Boolean = false,
 )
 
 // ponytail: in-memory only; Phase 7 backs this with DataStore so settings survive a restart.

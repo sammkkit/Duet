@@ -6,6 +6,7 @@ import com.samkit.duet.core.model.FLASH
 import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.SavedFile
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,24 +14,30 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import platform.AVFoundation.AVAuthorizationStatusAuthorized
 import platform.AVFoundation.AVCaptureConnection
 import platform.AVFoundation.AVCaptureDevice
 import platform.AVFoundation.AVCaptureDeviceInput
 import platform.AVFoundation.AVCaptureDevicePositionBack
 import platform.AVFoundation.AVCaptureDevicePositionFront
 import platform.AVFoundation.AVCaptureDeviceTypeBuiltInWideAngleCamera
+import platform.AVFoundation.AVCaptureFileOutput
+import platform.AVFoundation.AVCaptureFileOutputRecordingDelegateProtocol
 import platform.AVFoundation.AVCaptureFlashModeAuto
 import platform.AVFoundation.AVCaptureFlashModeOff
 import platform.AVFoundation.AVCaptureFlashModeOn
 import platform.AVFoundation.AVCaptureInputPort
+import platform.AVFoundation.AVCaptureMovieFileOutput
 import platform.AVFoundation.AVCaptureMultiCamSession
 import platform.AVFoundation.AVCapturePhoto
 import platform.AVFoundation.AVCapturePhotoCaptureDelegateProtocol
@@ -43,9 +50,11 @@ import platform.AVFoundation.AVCaptureSessionInterruptionReasonVideoDeviceInUseB
 import platform.AVFoundation.AVCaptureSessionRuntimeErrorNotification
 import platform.AVFoundation.AVCaptureSessionWasInterruptedNotification
 import platform.AVFoundation.AVCaptureVideoPreviewLayer
+import platform.AVFoundation.AVMediaTypeAudio
 import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.AVVideoCodecKey
 import platform.AVFoundation.AVVideoCodecTypeJPEG
+import platform.AVFoundation.authorizationStatusForMediaType
 import platform.AVFoundation.defaultDeviceWithDeviceType
 import platform.AVFoundation.fileDataRepresentation
 import platform.AVFoundation.maxAvailableVideoZoomFactor
@@ -55,14 +64,18 @@ import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSError
+import platform.Foundation.NSFileManager
 import platform.Foundation.NSLocale
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSNumber
 import platform.Foundation.NSOperationQueue
+import platform.Foundation.NSTemporaryDirectory
+import platform.Foundation.NSURL
 import platform.darwin.NSObject
 import platform.darwin.NSObjectProtocol
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.TimeSource
 
 /**
  * CameraController on top of AVFoundation, mirroring CameraXController.
@@ -87,12 +100,20 @@ class AVFoundationController : CameraController {
     private var zoom = 1f
     private var flash = FLASH.OFF
 
+    // Single camera only, like Android: a multi-cam session can't afford another output per camera.
+    private var movieOutput: AVCaptureMovieFileOutput? = null
+    private var micInput: AVCaptureDeviceInput? = null
+    private var recordingResult: CompletableDeferred<Result<SavedFile>>? = null
+    private var recordingDelegate: RecordingDelegate? = null // AVFoundation doesn't keep it alive either
+    private var timerJob: Job? = null
+
     // AVCapturePhotoOutput doesn't keep its delegate alive, so in-flight captures are held here.
     private val inFlight = mutableSetOf<PhotoDelegate>()
 
     private data class Bound(
         val device: AVCaptureDevice,
         val photoOutput: AVCapturePhotoOutput,
+        val port: AVCaptureInputPort,
     )
 
     /** iOS-only: a CameraPreview showing [lens] appeared. */
@@ -145,9 +166,46 @@ class AVFoundationController : CameraController {
             }
         }
 
-    override fun startRecording(): Unit = TODO("#13 video recording")
+    override fun startRecording() {
+        val output = movieOutput ?: return
+        if (output.recording) return
+        val result = CompletableDeferred<Result<SavedFile>>().also { recordingResult = it }
+        session?.connectMic(output)
+        val name = "VID_${timestamp()}"
+        val url = NSURL.fileURLWithPath(NSTemporaryDirectory() + "$name.mov")
+        val delegate =
+            RecordingDelegate { file ->
+                scope.launch {
+                    timerJob?.cancel()
+                    recordingDelegate = null
+                    _state.value = if (session?.running == true) CameraState.Ready else CameraState.Idle
+                    // An "error" can still leave a playable movie (e.g. stopped by an interruption): only a missing file fails.
+                    val saved =
+                        runCatching {
+                            check(NSFileManager.defaultManager.fileExistsAtPath(file.path.orEmpty())) { "Recording failed" }
+                            saveVideoToPhotos(file, name)
+                        }
+                    NSFileManager.defaultManager.removeItemAtURL(file, null) // the copy in Photos is what counts
+                    result.complete(saved)
+                }
+            }
+        recordingDelegate = delegate
+        output.startRecordingToOutputFileURL(url, delegate)
+        val start = TimeSource.Monotonic.markNow()
+        timerJob =
+            scope.launch {
+                while (isActive) {
+                    _state.value = CameraState.Recording(start.elapsedNow())
+                    delay(500)
+                }
+            }
+    }
 
-    override suspend fun stopRecording(): Result<SavedFile> = TODO("#13 video recording")
+    override suspend fun stopRecording(): Result<SavedFile> {
+        val result = recordingResult ?: return Result.failure(IllegalStateException("Not recording"))
+        withContext(Dispatchers.Main) { movieOutput?.stopRecording() }
+        return result.await().also { recordingResult = null }
+    }
 
     override fun setZoom(ratio: Float) {
         zoom = ratio
@@ -167,6 +225,8 @@ class AVFoundationController : CameraController {
         val old = session
         session = null
         bound.clear()
+        movieOutput = null
+        micInput = null
         observers.forEach { NSNotificationCenter.defaultCenter.removeObserver(it) }
         observers = emptyList()
         // start/stopRunning block for a few hundred ms: keep them off the main thread.
@@ -188,6 +248,7 @@ class AVFoundationController : CameraController {
             layers.all { (lens, layer) ->
                 new.connect(lens, devices.getValue(lens)!!, layer)?.also { bound[lens] = it } != null
             }
+        if (ok && layers.size == 1) movieOutput = new.connectMovieOutput(bound.values.single().port)
         new.commitConfiguration()
         if (!ok) {
             bound.clear()
@@ -232,7 +293,36 @@ class AVFoundationController : CameraController {
             previewConnection.automaticallyAdjustsVideoMirroring = false
             previewConnection.videoMirrored = true
         }
-        return Bound(device, photoOutput)
+        return Bound(device, photoOutput, port)
+    }
+
+    /** camera -> movie file. Null if this session can't take one more output. */
+    private fun AVCaptureSession.connectMovieOutput(port: AVCaptureInputPort): AVCaptureMovieFileOutput? {
+        val output = AVCaptureMovieFileOutput()
+        if (!canAddOutput(output)) return null
+        addOutputWithNoConnections(output)
+        val connection = AVCaptureConnection(inputPorts = listOf(port), output = output)
+        if (!canAddConnection(connection)) return null
+        addConnection(connection)
+        if (connection.isVideoRotationAngleSupported(90.0)) connection.videoRotationAngle = 90.0
+        return output
+    }
+
+    // Added when recording starts, not at bind: the mic permission may have been granted after the camera opened.
+    private fun AVCaptureSession.connectMic(output: AVCaptureMovieFileOutput) {
+        if (micInput != null) return
+        if (AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeAudio) != AVAuthorizationStatusAuthorized) return
+        val mic = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeAudio) ?: return
+        val input = AVCaptureDeviceInput.deviceInputWithDevice(mic, null) ?: return
+        beginConfiguration()
+        if (canAddInput(input)) {
+            addInputWithNoConnections(input)
+            val port = input.ports.filterIsInstance<AVCaptureInputPort>().firstOrNull { it.mediaType == AVMediaTypeAudio }
+            val connection = port?.let { AVCaptureConnection(inputPorts = listOf(it), output = output) }
+            if (connection != null && canAddConnection(connection)) addConnection(connection)
+            micInput = input
+        }
+        commitConfiguration()
     }
 
     // Interruptions are iOS's version of CameraX's camera state: another app took the camera, a call came in, etc.
@@ -288,6 +378,20 @@ class AVFoundationController : CameraController {
             inFlight += delegate
             capturePhotoWithSettings(settings, delegate)
         }
+}
+
+private class RecordingDelegate(
+    private val onDone: (NSURL) -> Unit,
+) : NSObject(),
+    AVCaptureFileOutputRecordingDelegateProtocol {
+    override fun captureOutput(
+        output: AVCaptureFileOutput,
+        didFinishRecordingToOutputFileAtURL: NSURL,
+        fromConnections: List<*>,
+        error: NSError?,
+    ) {
+        onDone(didFinishRecordingToOutputFileAtURL)
+    }
 }
 
 private class PhotoDelegate(

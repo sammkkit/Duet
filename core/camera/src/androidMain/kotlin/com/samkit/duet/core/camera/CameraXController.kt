@@ -1,7 +1,11 @@
 package com.samkit.duet.core.camera
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.camera.core.Camera
@@ -12,10 +16,19 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FallbackStrategy
+import androidx.camera.video.MediaStoreOutputOptions
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
 import androidx.lifecycle.LifecycleOwner
 import com.samkit.duet.core.model.FLASH
 import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.SavedFile
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,6 +47,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration.Companion.nanoseconds
 import androidx.camera.core.CameraState as XCameraState
 
 /**
@@ -59,6 +73,8 @@ class CameraXController(
     private var provider: ProcessCameraProvider? = null
     private var zoom = 1f
     private var flash = FLASH.OFF
+    private var recording: Recording? = null
+    private var recordingResult: CompletableDeferred<Result<SavedFile>>? = null
 
     /** One camera's use cases, tied to the preview surface showing it. */
     private class Slot(
@@ -66,6 +82,15 @@ class CameraXController(
     ) {
         val preview = Preview.Builder().build().also { it.surfaceProvider = surfaceProvider }
         val imageCapture = ImageCapture.Builder().build()
+
+        // Single camera only: concurrent cameras can't add a third stream per camera on most phones.
+        val videoCapture =
+            VideoCapture.withOutput(
+                Recorder
+                    .Builder()
+                    .setQualitySelector(QualitySelector.from(Quality.FHD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)))
+                    .build(),
+            )
     }
 
     /** Android-only: a CameraPreview showing [lens] appeared. */
@@ -149,9 +174,54 @@ class CameraXController(
         }
     }
 
-    override fun startRecording(): Unit = TODO("#13 video recording")
+    @SuppressLint("MissingPermission") // checked just below; without it the video is recorded silent
+    override fun startRecording() {
+        if (recording != null) return
+        val capture = slots.values.singleOrNull()?.videoCapture ?: return
+        val result = CompletableDeferred<Result<SavedFile>>().also { recordingResult = it }
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val values =
+            ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, "VID_$stamp.mp4")
+                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) put(MediaStore.MediaColumns.RELATIVE_PATH, GALLERY_FOLDER)
+            }
+        val output =
+            MediaStoreOutputOptions
+                .Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+                .setContentValues(values)
+                .build()
+        val hasMic = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        recording =
+            capture.output
+                .prepareRecording(context, output)
+                .apply { if (hasMic) withAudioEnabled() }
+                .start(DirectExecutor) { event ->
+                    when (event) {
+                        is VideoRecordEvent.Status ->
+                            _state.value = CameraState.Recording(event.recordingStats.recordedDurationNanos.nanoseconds)
+                        is VideoRecordEvent.Finalize -> {
+                            recording = null
+                            _state.value = combinedState()
+                            // Some "errors" (camera closed mid-recording) still leave a playable file; only no file is a failure.
+                            val uri = event.outputResults.outputUri
+                            result.complete(
+                                if (uri != Uri.EMPTY) {
+                                    Result.success(SavedFile(uri.toString()))
+                                } else {
+                                    Result.failure(IllegalStateException("Recording failed: ${event.error}", event.cause))
+                                },
+                            )
+                        }
+                    }
+                }
+    }
 
-    override suspend fun stopRecording(): Result<SavedFile> = TODO("#13 video recording")
+    override suspend fun stopRecording(): Result<SavedFile> {
+        val result = recordingResult ?: return Result.failure(IllegalStateException("Not recording"))
+        recording?.stop()
+        return result.await().also { recordingResult = null }
+    }
 
     override fun setZoom(ratio: Float) {
         zoom = ratio
@@ -189,7 +259,11 @@ class CameraXController(
         runCatching {
             if (slots.size == 1) {
                 val (lens, slot) = slots.entries.first()
-                bound[lens] = provider.bindToLifecycle(owner, lens.toSelector(), slot.preview, slot.imageCapture)
+                // Some older phones can't run preview + photo + video together: then photos still work, video doesn't.
+                bound[lens] =
+                    runCatching {
+                        provider.bindToLifecycle(owner, lens.toSelector(), slot.preview, slot.imageCapture, slot.videoCapture)
+                    }.getOrElse { provider.bindToLifecycle(owner, lens.toSelector(), slot.preview, slot.imageCapture) }
             } else {
                 val configs =
                     slots.map { (lens, slot) ->
@@ -214,7 +288,7 @@ class CameraXController(
         bound.forEach { (lens, camera) ->
             camera.cameraInfo.cameraState.observe(owner) { xState ->
                 cameraStates[lens] = xState.toCameraState()
-                _state.value = combinedState()
+                if (recording == null) _state.value = combinedState()
             }
         }
     }

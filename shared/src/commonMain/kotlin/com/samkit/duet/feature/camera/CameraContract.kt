@@ -17,14 +17,7 @@ sealed interface CameraAction {
         val type: CaptureType,
     ) : CameraAction
 
-    data class SelectSeparateType(
-        val lens: LENS,
-        val type: CaptureType,
-    ) : CameraAction
-
     data object ShutterClick : CameraAction
-
-    data object SnapBothPhotos : CameraAction
 
     data object SwapCameras : CameraAction
 
@@ -56,8 +49,6 @@ sealed interface CameraAction {
 
     data object UseSingleCamera : CameraAction
 
-    data object CaptureBackThenFront : CameraAction
-
     data object DismissDualUnavailable : CameraAction
 
     data object OpenLayoutPicker : CameraAction
@@ -75,8 +66,6 @@ sealed interface CameraEffect {
 
     /** A photo is being taken: blink the preview and buzz, like a real camera. */
     data object Shutter : CameraEffect
-
-    data object NavigateToReview : CameraEffect
 
     /** Thumbnail tapped: show the last photo in the phone's photo viewer. */
     data class OpenPhoto(

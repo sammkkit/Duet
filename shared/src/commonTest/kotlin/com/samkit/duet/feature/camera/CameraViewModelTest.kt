@@ -1,5 +1,6 @@
 package com.samkit.duet.feature.camera
 
+import com.samkit.duet.core.camera.CameraState
 import com.samkit.duet.core.camera.PhotoComposition
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
@@ -14,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -67,26 +67,48 @@ class CameraViewModelTest {
         }
 
     @Test
-    fun timerCountsWhileRecordingAndStopsAfter() =
+    fun timerShowsWhatTheCameraReports() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
+            vm.onAction(CameraAction.ShutterClick)
+            camera.state.value = CameraState.Recording(3.seconds)
+            runCurrent()
+            assertEquals(3.seconds, vm.state.value.elapsed)
+            vm.onAction(CameraAction.ShutterClick)
+        }
+
+    @Test
+    fun stoppedVideoBecomesTheThumbnail() =
         runTest(dispatcher) {
             val vm = videoViewModel()
             vm.onAction(CameraAction.ShutterClick)
-            advanceTimeBy(3.seconds)
             runCurrent()
-            assertEquals(3.seconds, vm.state.value.elapsed)
-
             vm.onAction(CameraAction.ShutterClick)
-            advanceTimeBy(5.seconds)
             runCurrent()
-            assertEquals(3.seconds, vm.state.value.elapsed)
+            assertEquals(SavedFile("fake-video"), vm.state.value.lastCapture)
+        }
+
+    @Test
+    fun recordingEndedByTheCameraIsStillSaved() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+            camera.state.value = CameraState.Ready // e.g. app sent to the background
+            runCurrent()
+            assertFalse(vm.state.value.isRecording)
+            assertEquals(SavedFile("fake-video"), vm.state.value.lastCapture)
         }
 
     @Test
     fun newRecordingResetsTimer() =
         runTest(dispatcher) {
-            val vm = videoViewModel()
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
             vm.onAction(CameraAction.ShutterClick)
-            advanceTimeBy(2.seconds)
+            camera.state.value = CameraState.Recording(2.seconds)
             runCurrent()
             vm.onAction(CameraAction.ShutterClick)
 
@@ -102,25 +124,26 @@ class CameraViewModelTest {
             vm.onAction(CameraAction.ShutterClick)
             vm.onAction(CameraAction.SelectLayout(CaptureLayout.SPLIT))
             vm.onAction(CameraAction.SelectCaptureType(CaptureType.PHOTO))
+            vm.onAction(CameraAction.SwapCameras)
             assertEquals(CaptureLayout.SINGLE, vm.state.value.layout)
             assertEquals(CaptureType.VIDEO, vm.state.value.captureType)
+            assertEquals(LENS.BACK, vm.state.value.mainLens)
             vm.onAction(CameraAction.ShutterClick)
         }
 
     @Test
-    fun separateModeRecordsWhenEitherCameraIsVideo() =
+    fun dualLayoutsTakePhotosEvenWhenVideoWasPicked() =
         runTest(dispatcher) {
-            val vm = CameraViewModel(SettingsRepository(), FakeCameraController())
-            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SEPARATE))
-            vm.onAction(CameraAction.SelectSeparateType(LENS.BACK, CaptureType.PHOTO))
-            vm.onAction(CameraAction.SelectSeparateType(LENS.FRONT, CaptureType.PHOTO))
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.PIP))
             vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
             assertFalse(vm.state.value.isRecording)
+            assertEquals(1, camera.photosTaken)
 
-            vm.onAction(CameraAction.SelectSeparateType(LENS.FRONT, CaptureType.VIDEO))
-            vm.onAction(CameraAction.ShutterClick)
-            assertTrue(vm.state.value.isRecording)
-            vm.onAction(CameraAction.ShutterClick)
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SINGLE)) // the Video choice is still there
+            assertEquals(CaptureType.VIDEO, vm.state.value.shutterType)
         }
 
     @Test
@@ -263,7 +286,7 @@ class CameraViewModelTest {
             assertEquals(PhotoComposition.Split(LENS.BACK, SplitDirection.TopBottom, 0.6f), camera.lastComposition)
 
             vm.onAction(CameraAction.SelectLayout(CaptureLayout.SEPARATE))
-            vm.onAction(CameraAction.SnapBothPhotos)
+            vm.onAction(CameraAction.ShutterClick)
             runCurrent()
             assertEquals(null, camera.lastComposition)
         }

@@ -3,6 +3,7 @@ package com.samkit.duet.feature.camera
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.samkit.duet.core.camera.CameraController
+import com.samkit.duet.core.camera.CameraState
 import com.samkit.duet.core.camera.PhotoComposition
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
@@ -11,19 +12,15 @@ import com.samkit.duet.core.model.LENS
 import com.samkit.duet.core.model.SplitDirection
 import com.samkit.duet.core.settings.SettingsRepository
 import com.samkit.duet.core.settings.UserSettings
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 class CameraViewModel(
     private val settingsRepository: SettingsRepository,
@@ -41,10 +38,23 @@ class CameraViewModel(
     private val _effects = Channel<CameraEffect>(Channel.BUFFERED)
     val effects: Flow<CameraEffect> = _effects.receiveAsFlow()
 
-    private var timerJob: Job? = null
+    // Set by the camera's first Recording update: before that, "not recording" just means it hasn't started yet.
+    private var recordingStarted = false
 
     init {
         viewModelScope.launch { dualCameraSupported = camera.supportsDualCamera() }
+        viewModelScope.launch {
+            camera.state.collect { cameraState ->
+                when {
+                    cameraState is CameraState.Recording -> {
+                        recordingStarted = true
+                        _state.update { it.copy(elapsed = cameraState.elapsed) }
+                    }
+                    // The camera ended it on its own (app backgrounded, call came in): collect the file all the same.
+                    recordingStarted && _state.value.isRecording -> stopRecording()
+                }
+            }
+        }
     }
 
     /** The single entry point for user input. */
@@ -52,16 +62,9 @@ class CameraViewModel(
         when (action) {
             is CameraAction.SelectLayout -> selectLayout(action.layout)
             is CameraAction.SelectCaptureType -> updateUnlessLocked { it.copy(captureType = action.type) }
-            is CameraAction.SelectSeparateType ->
-                updateUnlessLocked {
-                    when (action.lens) {
-                        LENS.BACK -> it.copy(backType = action.type)
-                        LENS.FRONT -> it.copy(frontType = action.type)
-                    }
-                }
             CameraAction.ShutterClick -> onShutterClick()
-            CameraAction.SnapBothPhotos -> takePhoto()
-            CameraAction.SwapCameras -> _state.update { it.copy(mainLens = it.mainLens.other()) }
+            // Locked while recording: switching cameras would end the recording.
+            CameraAction.SwapCameras -> updateUnlessLocked { it.copy(mainLens = it.mainLens.other()) }
             is CameraAction.SelectMainLens -> _state.update { it.copy(mainLens = action.lens) }
             is CameraAction.SelectZoom -> {
                 _state.update { it.copy(zoom = action.level) }
@@ -80,12 +83,7 @@ class CameraViewModel(
             CameraAction.OpenLayoutPicker -> updateUnlessLocked { it.copy(isLayoutPickerOpen = true) }
             CameraAction.DismissLayoutPicker -> _state.update { it.copy(isLayoutPickerOpen = false) }
             CameraAction.UseSingleCamera -> _state.update { it.copy(layout = CaptureLayout.SINGLE, isDualUnavailableOpen = false) }
-            CameraAction.CaptureBackThenFront, CameraAction.DismissDualUnavailable ->
-                _state.update {
-                    it.copy(
-                        isDualUnavailableOpen = false,
-                    )
-                }
+            CameraAction.DismissDualUnavailable -> _state.update { it.copy(isDualUnavailableOpen = false) }
             CameraAction.OpenSettings -> emit(CameraEffect.NavigateToSettings)
             CameraAction.OpenLastCapture -> _state.value.lastCapture?.let { emit(CameraEffect.OpenPhoto(it)) }
         }
@@ -120,23 +118,19 @@ class CameraViewModel(
         }
     }
 
-    // ponytail: fake timer that ticks +1 s; Phase 2 replaces it with CameraX's recorded duration.
     private fun startRecording() {
+        recordingStarted = false
         _state.update { it.copy(isRecording = true, elapsed = Duration.ZERO) }
-        timerJob?.cancel()
-        timerJob =
-            viewModelScope.launch {
-                while (isActive) {
-                    delay(1.seconds)
-                    _state.update { it.copy(elapsed = it.elapsed + 1.seconds) }
-                }
-            }
+        camera.startRecording()
     }
 
     private fun stopRecording() {
-        timerJob?.cancel()
-        timerJob = null
+        if (!_state.value.isRecording) return
+        recordingStarted = false
         _state.update { it.copy(isRecording = false) }
+        viewModelScope.launch {
+            camera.stopRecording().onSuccess { file -> _state.update { it.copy(lastCapture = file) } }
+        }
     }
 
     private fun updateUnlessLocked(transform: (CameraUiState) -> CameraUiState) {

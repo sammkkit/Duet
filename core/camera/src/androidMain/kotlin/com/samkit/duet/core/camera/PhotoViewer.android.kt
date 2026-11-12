@@ -14,9 +14,10 @@ actual fun rememberPhotoViewer(): (SavedFile) -> Unit {
     return remember(context) {
         { file ->
             // ACTION_VIEW lets the user's gallery app (Google Photos, Samsung Gallery...) show it; the grant lets it read our URI.
+            val uri = Uri.parse(file.id)
             val intent =
                 Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(Uri.parse(file.id), "image/jpeg")
+                    .setDataAndType(uri, context.contentResolver.getType(uri) ?: "image/*")
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             try {
                 context.startActivity(intent)
