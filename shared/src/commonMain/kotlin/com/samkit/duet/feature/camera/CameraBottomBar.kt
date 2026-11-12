@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -37,10 +38,8 @@ import com.samkit.duet.core.ui.ModeTabs
 import com.samkit.duet.core.ui.ShutterButton
 import com.samkit.duet.core.ui.colors
 import duet.shared.generated.resources.Res
+import duet.shared.generated.resources.dual_photo_hint
 import duet.shared.generated.resources.open_last_capture
-import duet.shared.generated.resources.pause_recording
-import duet.shared.generated.resources.separate_hint
-import duet.shared.generated.resources.snap_both
 import duet.shared.generated.resources.switch_to_back
 import duet.shared.generated.resources.switch_to_front
 import org.jetbrains.compose.resources.stringResource
@@ -57,16 +56,17 @@ internal fun CameraBottomBar(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (state.layout == CaptureLayout.SEPARATE) {
+        // Video is Single-only for now; the dual layouts take photos. Same height either way so nothing jumps.
+        if (state.layout == CaptureLayout.SINGLE) {
+            CaptureTypeToggle(selected = state.captureType, onSelect = { onAction(CameraAction.SelectCaptureType(it)) })
+        } else {
             Text(
-                text = stringResource(Res.string.separate_hint),
+                text = stringResource(Res.string.dual_photo_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.height(40.dp).wrapContentHeight(),
             )
-        } else {
-            CaptureTypeToggle(selected = state.captureType, onSelect = { onAction(CameraAction.SelectCaptureType(it)) })
         }
 
         ModeTabs(selected = state.layout, onSelect = { onAction(CameraAction.SelectLayout(it)) })
@@ -87,45 +87,22 @@ internal fun CameraBottomBar(
     }
 }
 
-/** Right of the shutter: flip, pause or "snap both", depending on the layout. */
+/** Right of the shutter: flip in Single and Video call (Split and Separate already show both cameras). */
 @Composable
 private fun SecondaryButton(
     state: CameraUiState,
     onAction: (CameraAction) -> Unit,
 ) {
-    when {
-        state.layout == CaptureLayout.SEPARATE ->
-            CircleIconButton(
-                onClick = { onAction(CameraAction.SnapBothPhotos) },
-                icon = DuetIcons.Photo,
-                contentDescription = stringResource(Res.string.snap_both),
-                size = CircleIconButtonDefaults.LargeSize,
-            )
-        state.layout == CaptureLayout.PIP && state.isRecording ->
-            // Pause needs a real recorder (Phase 2); shown disabled so the layout matches the design.
-            CircleIconButton(
-                onClick = {},
-                icon = DuetIcons.Pause,
-                contentDescription = stringResource(Res.string.pause_recording),
-                size = CircleIconButtonDefaults.LargeSize,
-                enabled = false,
-            )
-        else ->
-            CircleIconButton(
-                onClick = { onAction(CameraAction.SwapCameras) },
-                icon = DuetIcons.Flip,
-                contentDescription =
-                    stringResource(
-                        if (state.mainLens ==
-                            LENS.BACK
-                        ) {
-                            Res.string.switch_to_front
-                        } else {
-                            Res.string.switch_to_back
-                        },
-                    ),
-                size = CircleIconButtonDefaults.LargeSize,
-            )
+    if (state.layout == CaptureLayout.SINGLE || state.layout == CaptureLayout.PIP) {
+        CircleIconButton(
+            onClick = { onAction(CameraAction.SwapCameras) },
+            icon = DuetIcons.Flip,
+            contentDescription = stringResource(if (state.mainLens == LENS.BACK) Res.string.switch_to_front else Res.string.switch_to_back),
+            size = CircleIconButtonDefaults.LargeSize,
+            enabled = !state.isRecording,
+        )
+    } else {
+        Spacer(Modifier.size(CircleIconButtonDefaults.LargeSize)) // keeps the shutter centered
     }
 }
 

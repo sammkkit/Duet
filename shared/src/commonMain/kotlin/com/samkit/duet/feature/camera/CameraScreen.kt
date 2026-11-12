@@ -30,6 +30,9 @@ import com.samkit.duet.core.camera.rememberPhotoViewer
 import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.model.CaptureLayout
 import com.samkit.duet.core.model.CaptureType
+import com.samkit.duet.core.permissions.Permission
+import com.samkit.duet.core.permissions.PermissionState
+import com.samkit.duet.core.permissions.rememberPermissionState
 import com.samkit.duet.feature.camera.layouts.PipLayout
 import com.samkit.duet.feature.camera.layouts.SeparateLayout
 import com.samkit.duet.feature.camera.layouts.SingleLayout
@@ -45,7 +48,6 @@ import kotlin.time.Duration.Companion.seconds
 @Composable
 fun CameraRoute(
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToReview: () -> Unit = {},
     viewModel: CameraViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -53,7 +55,12 @@ fun CameraRoute(
 
     // The effect collector outlives recompositions; read the latest callbacks, not the ones from the first frame.
     val toSettings by rememberUpdatedState(onNavigateToSettings)
-    val toReview by rememberUpdatedState(onNavigateToReview)
+    // Asked when Video is picked, not at launch: photo-only users never see a mic prompt. Denied = silent video.
+    val mic = rememberPermissionState(Permission.MICROPHONE)
+    LaunchedEffect(state.captureType) {
+        if (state.captureType == CaptureType.VIDEO && mic.state == PermissionState.Denied) mic.request()
+    }
+
     val haptics = LocalHapticFeedback.current
     val openPhoto by rememberUpdatedState(rememberPhotoViewer())
     val shutterFlash = remember { Animatable(0f) }
@@ -71,7 +78,6 @@ fun CameraRoute(
                             shutterFlash.animateTo(0f, tween(durationMillis = 250))
                         }
                     }
-                    CameraEffect.NavigateToReview -> toReview()
                     is CameraEffect.OpenPhoto -> openPhoto(effect.file)
                 }
             }

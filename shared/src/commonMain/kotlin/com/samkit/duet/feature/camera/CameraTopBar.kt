@@ -1,7 +1,6 @@
 package com.samkit.duet.feature.camera
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,7 +24,6 @@ import com.samkit.duet.core.model.FLASH
 import com.samkit.duet.core.model.SplitDirection
 import com.samkit.duet.core.ui.RecordingPill
 import duet.shared.generated.resources.Res
-import duet.shared.generated.resources.aspect_ratio_4_3
 import duet.shared.generated.resources.change_layout
 import duet.shared.generated.resources.flash_auto
 import duet.shared.generated.resources.flash_off
@@ -34,8 +32,6 @@ import duet.shared.generated.resources.saving_two_files
 import duet.shared.generated.resources.settings
 import duet.shared.generated.resources.split_left_right
 import duet.shared.generated.resources.split_top_bottom
-import duet.shared.generated.resources.timer
-import duet.shared.generated.resources.timer_off
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -90,44 +86,20 @@ internal fun CameraTopBar(
     }
 }
 
-/** What goes in the top bar's center slot for each layout. */
+/** What goes in the top bar's center slot: the recording timer, or the current layout's own control. */
 @Composable
 internal fun TopBarCenter(
     state: CameraUiState,
     onAction: (CameraAction) -> Unit,
 ) {
-    when (state.layout) {
-        CaptureLayout.SINGLE ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedPill(text = stringResource(Res.string.aspect_ratio_4_3))
-                OutlinedPill(
-                    text = stringResource(Res.string.timer_off),
-                    leading = { Icon(DuetIcons.Timer, contentDescription = stringResource(Res.string.timer), Modifier.size(16.dp)) },
-                )
-            }
-        CaptureLayout.PIP -> if (state.isRecording) RecordingPill(elapsed = state.elapsed)
-        CaptureLayout.SPLIT -> SplitDirectionButton(state.splitDirection) { onAction(CameraAction.ToggleSplitDirection) }
-        CaptureLayout.SEPARATE ->
+    when {
+        state.isRecording -> RecordingPill(elapsed = state.elapsed)
+        state.layout == CaptureLayout.SPLIT -> SplitDirectionButton(state.splitDirection) { onAction(CameraAction.ToggleSplitDirection) }
+        state.layout == CaptureLayout.SEPARATE ->
             InfoPill(text = stringResource(Res.string.saving_two_files), leading = {
                 Icon(DuetIcons.File, contentDescription = null, Modifier.size(16.dp))
             })
     }
-}
-
-@Composable
-private fun OutlinedPill(
-    text: String,
-    leading: (@Composable () -> Unit)? = null,
-) {
-    InfoPill(
-        text = text,
-        leading = leading,
-        height = 40.dp,
-        modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        textStyle = MaterialTheme.typography.labelLarge,
-    )
 }
 
 @Composable

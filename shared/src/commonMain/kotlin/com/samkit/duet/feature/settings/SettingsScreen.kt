@@ -1,6 +1,5 @@
 package com.samkit.duet.feature.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,24 +29,11 @@ import com.samkit.duet.core.designsystem.theme.DuetTheme
 import com.samkit.duet.core.settings.UserSettings
 import com.samkit.duet.ui.SectionHeader
 import com.samkit.duet.ui.SwitchRow
-import com.samkit.duet.ui.ValueRow
 import duet.shared.generated.resources.Res
-import duet.shared.generated.resources.audio
-import duet.shared.generated.resources.audio_value
 import duet.shared.generated.resources.back
-import duet.shared.generated.resources.dual_supported_body
-import duet.shared.generated.resources.dual_supported_title
 import duet.shared.generated.resources.keep_originals
 import duet.shared.generated.resources.keep_originals_desc
-import duet.shared.generated.resources.mirror_front
-import duet.shared.generated.resources.mirror_front_desc
-import duet.shared.generated.resources.photo_format
-import duet.shared.generated.resources.photo_format_value
-import duet.shared.generated.resources.save_to
-import duet.shared.generated.resources.save_to_value
 import duet.shared.generated.resources.section_dual
-import duet.shared.generated.resources.section_photo
-import duet.shared.generated.resources.section_storage
 import duet.shared.generated.resources.settings
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -86,48 +72,11 @@ fun SettingsScreen(
             }
 
             SectionHeader(stringResource(Res.string.section_dual))
-            ValueRow(stringResource(Res.string.audio), stringResource(Res.string.audio_value))
             SwitchRow(
                 title = stringResource(Res.string.keep_originals),
                 description = stringResource(Res.string.keep_originals_desc),
                 checked = settings.keepOriginals,
                 onToggle = { onAction(SettingsAction.ToggleKeepOriginals) },
-            )
-
-            SectionHeader(stringResource(Res.string.section_photo))
-            ValueRow(stringResource(Res.string.photo_format), stringResource(Res.string.photo_format_value))
-            SwitchRow(
-                title = stringResource(Res.string.mirror_front),
-                description = stringResource(Res.string.mirror_front_desc),
-                checked = settings.mirrorFrontCamera,
-                onToggle = { onAction(SettingsAction.ToggleMirrorFront) },
-            )
-
-            SectionHeader(stringResource(Res.string.section_storage))
-            ValueRow(stringResource(Res.string.save_to), stringResource(Res.string.save_to_value))
-
-            DeviceSupportCard()
-        }
-    }
-}
-
-@Composable
-private fun DeviceSupportCard() {
-    Row(
-        Modifier
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp)
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Icon(DuetIcons.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(Res.string.dual_supported_title), style = MaterialTheme.typography.labelLarge)
-            Text(
-                stringResource(Res.string.dual_supported_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

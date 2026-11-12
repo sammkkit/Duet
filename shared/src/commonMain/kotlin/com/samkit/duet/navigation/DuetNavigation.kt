@@ -11,7 +11,6 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.samkit.duet.feature.camera.CameraPermissionGate
 import com.samkit.duet.feature.camera.CameraRoute
-import com.samkit.duet.feature.review.ReviewScreen
 import com.samkit.duet.feature.settings.SettingsRoute
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
@@ -25,9 +24,6 @@ data object CameraKey : NavKey
 @Serializable
 data object SettingsKey : NavKey
 
-@Serializable
-data object ReviewKey : NavKey
-
 // Non-JVM targets (iOS) can't find NavKey subclasses by reflection, so list them explicitly.
 private val navConfig =
     SavedStateConfiguration {
@@ -36,7 +32,6 @@ private val navConfig =
                 polymorphic(NavKey::class) {
                     subclass(CameraKey::class)
                     subclass(SettingsKey::class)
-                    subclass(ReviewKey::class)
                 }
             }
     }
@@ -63,12 +58,10 @@ fun DuetNavigation() {
                     CameraPermissionGate {
                         CameraRoute(
                             onNavigateToSettings = { backStack.add(SettingsKey) },
-                            onNavigateToReview = { backStack.add(ReviewKey) },
                         )
                     }
                 }
                 entry<SettingsKey> { SettingsRoute(onBack = back) }
-                entry<ReviewKey> { ReviewScreen(onBack = back) }
             },
     )
 }
