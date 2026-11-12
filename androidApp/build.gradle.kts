@@ -47,7 +47,8 @@ android {
     // without them the release build is just unsigned, nothing fails.
     val keystoreProps =
         Properties().apply {
-            rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+            val file = rootProject.file("keystore.properties")
+            if (file.exists()) file.inputStream().use { load(it) }
         }
     signingConfigs {
         create("release") {
