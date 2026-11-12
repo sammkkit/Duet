@@ -33,9 +33,9 @@ data class CameraUiState(
     /** Layout, capture type and separate-mode types are locked while recording. */
     val controlsLocked: Boolean get() = isRecording
 
-    /** What the shutter does. Video is Single-only for now: merging two live cameras into one video is Phase 5. */
+    /** What the shutter does. Split is photo-only for now; the other layouts record video too. */
     val shutterType: CaptureType
-        get() = if (layout == CaptureLayout.SINGLE) captureType else CaptureType.PHOTO
+        get() = if (layout == CaptureLayout.SPLIT) CaptureType.PHOTO else captureType
 }
 
 const val MIN_SPLIT_RATIO = 0.3f

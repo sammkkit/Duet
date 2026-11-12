@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -43,6 +45,10 @@ class CameraViewModel(
 
     init {
         viewModelScope.launch { dualCameraSupported = camera.supportsDualCamera() }
+        // The camera binds photo or video streams in dual layouts, so it follows what the shutter will do.
+        viewModelScope.launch {
+            _state.map { it.shutterType == CaptureType.VIDEO }.distinctUntilChanged().collect { camera.setVideoMode(it) }
+        }
         viewModelScope.launch {
             camera.state.collect { cameraState ->
                 when {
@@ -121,7 +127,7 @@ class CameraViewModel(
     private fun startRecording() {
         recordingStarted = false
         _state.update { it.copy(isRecording = true, elapsed = Duration.ZERO) }
-        camera.startRecording()
+        camera.startRecording(_state.value.videoComposition(), settingsRepository.settings.value.keepOriginals)
     }
 
     private fun stopRecording() {
@@ -129,7 +135,7 @@ class CameraViewModel(
         recordingStarted = false
         _state.update { it.copy(isRecording = false) }
         viewModelScope.launch {
-            camera.stopRecording().onSuccess { file -> _state.update { it.copy(lastCapture = file) } }
+            camera.stopRecording().onSuccess { files -> _state.update { it.copy(lastCapture = files.firstOrNull() ?: it.lastCapture) } }
         }
     }
 
@@ -152,6 +158,10 @@ private fun FLASH.next() =
         FLASH.ON -> FLASH.OFF
         FLASH.OFF -> FLASH.AUTO
     }
+
+/** Video call merges both cameras into one video; Separate saves one video per camera. */
+private fun CameraUiState.videoComposition(): PhotoComposition? =
+    if (layout == CaptureLayout.PIP) PhotoComposition.Pip(mainLens, pipCorner, pipShape) else null
 
 /** Video call and Split save one merged photo that looks like the screen; Single and Separate don't merge. */
 private fun CameraUiState.photoComposition(): PhotoComposition? =

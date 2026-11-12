@@ -132,18 +132,39 @@ class CameraViewModelTest {
         }
 
     @Test
-    fun dualLayoutsTakePhotosEvenWhenVideoWasPicked() =
+    fun pipRecordsOneMergedVideoAndSeparateRecordsEachCamera() =
         runTest(dispatcher) {
             val camera = FakeCameraController()
             val vm = CameraViewModel(SettingsRepository(), camera).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
+            runCurrent()
             vm.onAction(CameraAction.SelectLayout(CaptureLayout.PIP))
+            vm.onAction(CameraAction.ShutterClick)
+            assertTrue(vm.state.value.isRecording)
+            assertEquals(PhotoComposition.Pip(LENS.BACK, PipCorner.TopEnd, PipShape.ROUNDED), camera.lastVideoComposition)
+            vm.onAction(CameraAction.ShutterClick)
+            runCurrent()
+
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SEPARATE))
+            vm.onAction(CameraAction.ShutterClick)
+            assertEquals(null, camera.lastVideoComposition)
+            vm.onAction(CameraAction.ShutterClick)
+        }
+
+    @Test
+    fun splitStaysPhotoAndTheCameraFollowsTheShutter() =
+        runTest(dispatcher) {
+            val camera = FakeCameraController()
+            val vm = CameraViewModel(SettingsRepository(), camera).apply { onAction(CameraAction.SelectCaptureType(CaptureType.VIDEO)) }
+            runCurrent()
+            assertTrue(camera.currentVideoMode)
+
+            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SPLIT))
+            runCurrent()
+            assertFalse(camera.currentVideoMode)
             vm.onAction(CameraAction.ShutterClick)
             runCurrent()
             assertFalse(vm.state.value.isRecording)
             assertEquals(1, camera.photosTaken)
-
-            vm.onAction(CameraAction.SelectLayout(CaptureLayout.SINGLE)) // the Video choice is still there
-            assertEquals(CaptureType.VIDEO, vm.state.value.shutterType)
         }
 
     @Test

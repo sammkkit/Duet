@@ -15,6 +15,8 @@ kotlin {
         implementation(libs.camerax.lifecycle)
         implementation(libs.camerax.video)
         implementation(libs.camerax.view)
+        implementation(libs.media3.transformer)
+        implementation(libs.media3.effect)
         implementation(libs.androidx.lifecycle.runtimeCompose)
     }
 }
