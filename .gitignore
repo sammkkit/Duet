@@ -17,3 +17,9 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Signing: never commit keys or their passwords
+keystore.properties
+*.jks
+*.keystore
+androidApp/release/
