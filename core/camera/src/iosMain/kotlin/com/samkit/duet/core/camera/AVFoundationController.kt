@@ -100,20 +100,30 @@ class AVFoundationController : CameraController {
     private var zoom = 1f
     private var flash = FLASH.OFF
 
-    // Single camera only, like Android: a multi-cam session can't afford another output per camera.
-    private var movieOutput: AVCaptureMovieFileOutput? = null
+    // Dual layouts: a multi-cam session can't afford photo and movie outputs on both cameras, so one or the other.
+    private var videoMode = false
     private var micInput: AVCaptureDeviceInput? = null
-    private var recordingResult: CompletableDeferred<Result<SavedFile>>? = null
-    private var recordingDelegate: RecordingDelegate? = null // AVFoundation doesn't keep it alive either
+    private var active: ActiveRecording? = null
     private var timerJob: Job? = null
+
+    /** Everything one press of the shutter started: one movie per camera, merged on stop for PiP. */
+    private class ActiveRecording(
+        val outputs: Map<LENS, AVCaptureMovieFileOutput>,
+        val results: Map<LENS, CompletableDeferred<NSURL?>>,
+        val delegates: List<RecordingDelegate>, // AVFoundation doesn't keep them alive
+        val pip: PhotoComposition.Pip?,
+        val keepOriginals: Boolean,
+        val name: String,
+    )
 
     // AVCapturePhotoOutput doesn't keep its delegate alive, so in-flight captures are held here.
     private val inFlight = mutableSetOf<PhotoDelegate>()
 
     private data class Bound(
         val device: AVCaptureDevice,
-        val photoOutput: AVCapturePhotoOutput,
+        val photoOutput: AVCapturePhotoOutput?,
         val port: AVCaptureInputPort,
+        val movieOutput: AVCaptureMovieFileOutput? = null,
     )
 
     /** iOS-only: a CameraPreview showing [lens] appeared. */
@@ -142,13 +152,13 @@ class AVFoundationController : CameraController {
         keepOriginals: Boolean,
     ): Result<List<SavedFile>> =
         runCatching {
-            val targets = withContext(Dispatchers.Main) { bound.toMap() }
-            check(targets.isNotEmpty()) { "No camera is bound" }
+            val targets = withContext(Dispatchers.Main) { bound.mapNotNull { (lens, b) -> b.photoOutput?.let { lens to it } }.toMap() }
+            check(targets.isNotEmpty()) { "No camera is bound for photos" }
             withContext(Dispatchers.Main) { recentPhotos.clear() }
             val name = "IMG_${timestamp()}"
             val shots =
                 coroutineScope {
-                    targets.map { (lens, b) -> async { lens to b.photoOutput.capture() } }.awaitAll().toMap()
+                    targets.map { (lens, output) -> async { lens to output.capture() } }.awaitAll().toMap()
                 }
             if (composition != null && shots.size == 2) {
                 val merged = withContext(Dispatchers.Default) { composePhoto(shots, composition) }
@@ -166,31 +176,45 @@ class AVFoundationController : CameraController {
             }
         }
 
-    override fun startRecording() {
-        val output = movieOutput ?: return
-        if (output.recording) return
-        val result = CompletableDeferred<Result<SavedFile>>().also { recordingResult = it }
-        session?.connectMic(output)
+    override fun setVideoMode(enabled: Boolean) {
+        if (videoMode == enabled) return
+        videoMode = enabled
+        if (layers.size > 1) scheduleRebind() // a single camera already has photo and movie outputs
+    }
+
+    override fun startRecording(
+        composition: PhotoComposition?,
+        keepOriginals: Boolean,
+    ) {
+        if (active != null) return
+        val outputs = bound.mapNotNull { (lens, b) -> b.movieOutput?.let { lens to it } }.toMap()
+        if (outputs.isEmpty()) return
         val name = "VID_${timestamp()}"
-        val url = NSURL.fileURLWithPath(NSTemporaryDirectory() + "$name.mov")
-        val delegate =
-            RecordingDelegate { file ->
-                scope.launch {
-                    timerJob?.cancel()
-                    recordingDelegate = null
-                    _state.value = if (session?.running == true) CameraState.Ready else CameraState.Idle
-                    // An "error" can still leave a playable movie (e.g. stopped by an interruption): only a missing file fails.
-                    val saved =
-                        runCatching {
-                            check(NSFileManager.defaultManager.fileExistsAtPath(file.path.orEmpty())) { "Recording failed" }
-                            saveVideoToPhotos(file, name)
+        val pip = (composition as? PhotoComposition.Pip)?.takeIf { outputs.size == 2 }
+        // One microphone, one movie with sound: the main camera's (the back camera in Separate).
+        session?.connectMic(outputs.getValue(pip?.main ?: outputs.keys.first()))
+        val results = outputs.mapValues { CompletableDeferred<NSURL?>() }
+        val delegates =
+            outputs.map { (lens, output) ->
+                // An "error" can still leave a playable movie (e.g. stopped by an interruption): only a missing file fails.
+                RecordingDelegate { file ->
+                    scope.launch {
+                        results.getValue(lens).complete(file.takeIf { NSFileManager.defaultManager.fileExistsAtPath(it.path.orEmpty()) })
+                        if (results.values.all { it.isCompleted }) {
+                            timerJob?.cancel()
+                            _state.value = if (session?.running == true) CameraState.Ready else CameraState.Idle
                         }
-                    NSFileManager.defaultManager.removeItemAtURL(file, null) // the copy in Photos is what counts
-                    result.complete(saved)
+                    }
+                }.also {
+                    output.startRecordingToOutputFileURL(
+                        NSURL.fileURLWithPath(
+                            NSTemporaryDirectory() + "${name}_${lens.name.lowercase()}.mov",
+                        ),
+                        it,
+                    )
                 }
             }
-        recordingDelegate = delegate
-        output.startRecordingToOutputFileURL(url, delegate)
+        active = ActiveRecording(outputs, results, delegates, pip, keepOriginals, name)
         val start = TimeSource.Monotonic.markNow()
         timerJob =
             scope.launch {
@@ -201,10 +225,50 @@ class AVFoundationController : CameraController {
             }
     }
 
-    override suspend fun stopRecording(): Result<SavedFile> {
-        val result = recordingResult ?: return Result.failure(IllegalStateException("Not recording"))
-        withContext(Dispatchers.Main) { movieOutput?.stopRecording() }
-        return result.await().also { recordingResult = null }
+    override suspend fun stopRecording(): Result<List<SavedFile>> {
+        val recording = active ?: return Result.failure(IllegalStateException("Not recording"))
+        withContext(Dispatchers.Main) { recording.outputs.values.forEach { it.stopRecording() } }
+        val files = recording.results.mapValues { it.value.await() }
+        active = null
+        return runCatching {
+            try {
+                val recorded = files.mapNotNull { (lens, file) -> file?.let { lens to it } }.toMap()
+                check(recorded.isNotEmpty()) { "Recording failed" }
+                val pip = recording.pip
+                if (pip == null) {
+                    recorded.map { (lens, file) ->
+                        saveVideoToPhotos(
+                            file,
+                            if (recorded.size >
+                                1
+                            ) {
+                                "${recording.name}_${lens.name.lowercase()}"
+                            } else {
+                                recording.name
+                            },
+                        )
+                    }
+                } else {
+                    check(recorded.size == 2) { "A camera stopped recording" }
+                    val merged = NSURL.fileURLWithPath(NSTemporaryDirectory() + "${recording.name}.mov")
+                    try {
+                        composeVideo(recorded, pip, merged)
+                        val saved = mutableListOf(saveVideoToPhotos(merged, recording.name))
+                        if (recording.keepOriginals) {
+                            recorded.forEach { (lens, file) ->
+                                saved +=
+                                    saveVideoToPhotos(file, "${recording.name}_${lens.name.lowercase()}")
+                            }
+                        }
+                        saved
+                    } finally {
+                        NSFileManager.defaultManager.removeItemAtURL(merged, null)
+                    }
+                }
+            } finally {
+                files.values.filterNotNull().forEach { NSFileManager.defaultManager.removeItemAtURL(it, null) } // Photos has its own copy
+            }
+        }
     }
 
     override fun setZoom(ratio: Float) {
@@ -225,7 +289,6 @@ class AVFoundationController : CameraController {
         val old = session
         session = null
         bound.clear()
-        movieOutput = null
         micInput = null
         observers.forEach { NSNotificationCenter.defaultCenter.removeObserver(it) }
         observers = emptyList()
@@ -244,11 +307,17 @@ class AVFoundationController : CameraController {
 
         val new = if (layers.size > 1) AVCaptureMultiCamSession() else AVCaptureSession()
         new.beginConfiguration()
+        val single = layers.size == 1
         val ok =
             layers.all { (lens, layer) ->
-                new.connect(lens, devices.getValue(lens)!!, layer)?.also { bound[lens] = it } != null
+                new.connect(lens, devices.getValue(lens)!!, layer, photo = single || !videoMode)?.also { bound[lens] = it } != null
             }
-        if (ok && layers.size == 1) movieOutput = new.connectMovieOutput(bound.values.single().port)
+        if (ok && (single || videoMode)) {
+            for (lens in bound.keys.toList()) {
+                bound[lens] =
+                    bound.getValue(lens).let { it.copy(movieOutput = new.connectMovieOutput(it.port)) }
+            }
+        }
         new.commitConfiguration()
         if (!ok) {
             bound.clear()
@@ -263,11 +332,12 @@ class AVFoundationController : CameraController {
         _state.value = if (new.running) CameraState.Ready else CameraState.Error(CameraError.UNKNOWN)
     }
 
-    /** camera -> preview layer and camera -> photo output, as explicit connections. Null if the hardware refuses. */
+    /** camera -> preview layer and (if [photo]) camera -> photo output, as explicit connections. Null if the hardware refuses. */
     private fun AVCaptureSession.connect(
         lens: LENS,
         device: AVCaptureDevice,
         layer: AVCaptureVideoPreviewLayer,
+        photo: Boolean,
     ): Bound? {
         val input = AVCaptureDeviceInput.deviceInputWithDevice(device, null) ?: return null
         if (!canAddInput(input)) return null
@@ -279,15 +349,20 @@ class AVFoundationController : CameraController {
         if (!canAddConnection(previewConnection)) return null
         addConnection(previewConnection)
 
-        val photoOutput = AVCapturePhotoOutput()
-        if (!canAddOutput(photoOutput)) return null
-        addOutputWithNoConnections(photoOutput)
-        val photoConnection = AVCaptureConnection(inputPorts = listOf(port), output = photoOutput)
-        if (!canAddConnection(photoConnection)) return null
-        addConnection(photoConnection)
+        var photoOutput: AVCapturePhotoOutput? = null
+        if (photo) {
+            val output = AVCapturePhotoOutput()
+            if (!canAddOutput(output)) return null
+            addOutputWithNoConnections(output)
+            val photoConnection = AVCaptureConnection(inputPorts = listOf(port), output = output)
+            if (!canAddConnection(photoConnection)) return null
+            addConnection(photoConnection)
+            if (photoConnection.isVideoRotationAngleSupported(90.0)) photoConnection.videoRotationAngle = 90.0
+            photoOutput = output
+        }
 
         // Sensors are landscape; 90° = portrait, the only orientation the app uses.
-        listOf(previewConnection, photoConnection).forEach { if (it.isVideoRotationAngleSupported(90.0)) it.videoRotationAngle = 90.0 }
+        if (previewConnection.isVideoRotationAngleSupported(90.0)) previewConnection.videoRotationAngle = 90.0
         // Selfie preview mirrored like a mirror; the saved photo isn't (same as Android).
         if (lens == LENS.FRONT && previewConnection.isVideoMirroringSupported()) {
             previewConnection.automaticallyAdjustsVideoMirroring = false

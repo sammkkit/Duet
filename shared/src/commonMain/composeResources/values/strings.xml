@@ -19,7 +19,7 @@
     <string name="drag_split">Drag to resize split</string>
 
     <!-- Camera: bottom bar -->
-    <string name="dual_photo_hint">Photos only in this layout · video in Single</string>
+    <string name="dual_photo_hint">Split takes photos · switch layout for video</string>
     <string name="switch_to_back">Switch to back camera</string>
     <string name="switch_to_front">Switch to front camera</string>
     <string name="open_last_capture">Open last capture</string>

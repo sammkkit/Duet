@@ -56,8 +56,8 @@ internal fun CameraBottomBar(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Video is Single-only for now; the dual layouts take photos. Same height either way so nothing jumps.
-        if (state.layout == CaptureLayout.SINGLE) {
+        // Split is photo-only for now. Same height either way so nothing jumps.
+        if (state.layout != CaptureLayout.SPLIT) {
             CaptureTypeToggle(selected = state.captureType, onSelect = { onAction(CameraAction.SelectCaptureType(it)) })
         } else {
             Text(

@@ -17,7 +17,9 @@ class FakeCameraController(
     var currentFlash = FLASH.OFF
     var photosTaken = 0
     var photoResult: Result<List<SavedFile>> = Result.success(listOf(SavedFile("fake-photo")))
-    var videoResult: Result<SavedFile> = Result.success(SavedFile("fake-video"))
+    var videoResult: Result<List<SavedFile>> = Result.success(listOf(SavedFile("fake-video")))
+    var currentVideoMode = false
+    var lastVideoComposition: PhotoComposition? = null
 
     override suspend fun supportsDualCamera() = supportsDual
 
@@ -34,11 +36,19 @@ class FakeCameraController(
         return photoResult
     }
 
-    override fun startRecording() {
+    override fun setVideoMode(enabled: Boolean) {
+        currentVideoMode = enabled
+    }
+
+    override fun startRecording(
+        composition: PhotoComposition?,
+        keepOriginals: Boolean,
+    ) {
+        lastVideoComposition = composition
         state.value = CameraState.Recording(Duration.ZERO)
     }
 
-    override suspend fun stopRecording(): Result<SavedFile> {
+    override suspend fun stopRecording(): Result<List<SavedFile>> {
         state.value = CameraState.Ready
         return videoResult
     }

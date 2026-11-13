@@ -22,6 +22,7 @@ navigation3 = "1.1.2"
 ktlint = "14.2.0"
 material3 = "1.9.0"
 camerax = "1.6.2"
+media3 = "1.11.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -65,6 +66,9 @@ camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "ca
 camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" } # ProcessCameraProvider
 camerax-video = { module = "androidx.camera:camera-video", version.ref = "camerax" }        # Recorder, VideoCapture
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }          # PreviewView (#9 uses it)
+# Merges the two PiP recordings into one video after the fact
+media3-transformer = { module = "androidx.media3:media3-transformer", version.ref = "media3" }
+media3-effect = { module = "androidx.media3:media3-effect", version.ref = "media3" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

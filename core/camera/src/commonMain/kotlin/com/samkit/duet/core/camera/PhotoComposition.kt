@@ -5,7 +5,7 @@ import com.samkit.duet.core.model.PipCorner
 import com.samkit.duet.core.model.PipShape
 import com.samkit.duet.core.model.SplitDirection
 
-/** How to merge both cameras into one photo, mirroring the on-screen layout. */
+/** How to merge both cameras into one photo or video, mirroring the on-screen layout. */
 sealed interface PhotoComposition {
     data class Pip(
         val main: LENS,
